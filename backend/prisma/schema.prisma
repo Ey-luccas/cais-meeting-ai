@@ -1,0 +1,76 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+enum MeetingStatus {
+  PENDING
+  UPLOADED
+  TRANSCRIBING
+  TRANSCRIBED
+  PROCESSING_AI
+  COMPLETED
+  FAILED
+}
+
+model Meeting {
+  id              String        @id @default(uuid())
+  title           String
+  description     String?       @db.Text
+  audioPath       String?
+  durationSeconds Int?
+  status          MeetingStatus @default(PENDING)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  transcript      Transcript?
+  note            Note?
+  tags            MeetingTag[]
+
+  @@index([status])
+  @@index([createdAt])
+}
+
+model Transcript {
+  id        String   @id @default(uuid())
+  meetingId String   @unique
+  fullText  String   @db.LongText
+  language  String?
+  rawJson   Json?
+  createdAt DateTime @default(now())
+
+  meeting Meeting @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+
+  @@index([createdAt])
+}
+
+model Note {
+  id               String   @id @default(uuid())
+  meetingId        String   @unique
+  summary          String   @db.LongText
+  topicsJson       Json
+  decisionsJson    Json
+  actionItemsJson  Json
+  pendingItemsJson Json
+  commentsJson     Json
+  createdAt        DateTime @default(now())
+
+  meeting Meeting @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+
+  @@index([createdAt])
+}
+
+model MeetingTag {
+  id        String @id @default(uuid())
+  meetingId String
+  tag       String
+
+  meeting Meeting @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+
+  @@unique([meetingId, tag])
+  @@index([meetingId])
+  @@index([tag])
+}

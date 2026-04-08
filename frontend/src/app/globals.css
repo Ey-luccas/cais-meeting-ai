@@ -1,0 +1,83 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: 204 84% 24%;
+  --foreground: 41 25% 96%;
+  --card: 41 25% 96%;
+  --card-foreground: 204 86% 24%;
+  --border: 0 0% 100% / 0.2;
+  --ring: 41 89% 53%;
+  --muted: 203 42% 93%;
+  --muted-foreground: 203 33% 36%;
+  --surface-strong: #0a4c78;
+  --surface-mid: #1565c0;
+  --surface-soft: #0a5672;
+  --line-soft: rgba(255, 255, 255, 0.22);
+  --line-deep: rgba(10, 76, 120, 0.16);
+  --paper: #f8f7f4;
+  --ink: #0a4c78;
+  --accent: #f2b11b;
+}
+
+* {
+  @apply border-border;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  @apply text-foreground;
+  background:
+    radial-gradient(circle at 14% 12%, rgba(21, 101, 192, 0.46), transparent 36%),
+    radial-gradient(circle at 84% -4%, rgba(242, 177, 27, 0.18), transparent 30%),
+    radial-gradient(circle at 90% 88%, rgba(10, 86, 114, 0.44), transparent 40%),
+    linear-gradient(162deg, var(--surface-strong) 0%, var(--surface-mid) 48%, var(--surface-soft) 100%);
+  background-attachment: fixed;
+}
+
+a {
+  @apply no-underline;
+}
+
+::selection {
+  background-color: rgba(242, 177, 27, 0.3);
+  color: #072039;
+}
+
+@layer components {
+  .cais-glass {
+    @apply rounded-2xl border bg-white/10 backdrop-blur-sm;
+    border-color: var(--line-soft);
+  }
+
+  .cais-section-title {
+    @apply text-xs tracking-[0.2em] uppercase;
+    color: rgba(248, 247, 244, 0.72);
+  }
+
+  .cais-paper {
+    @apply rounded-2xl border;
+    border-color: var(--line-deep);
+    background-color: var(--paper);
+    color: var(--ink);
+  }
+
+  .cais-alert-error {
+    @apply rounded-lg border px-4 py-2 text-sm;
+    border-color: rgba(239, 68, 68, 0.35);
+    background-color: #fef2f2;
+    color: #b91c1c;
+  }
+
+  .cais-alert-success {
+    @apply rounded-lg border px-4 py-2 text-sm;
+    border-color: rgba(16, 185, 129, 0.35);
+    background-color: #ecfdf5;
+    color: #047857;
+  }
+}

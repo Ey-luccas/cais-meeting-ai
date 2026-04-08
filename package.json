@@ -1,0 +1,22 @@
+{
+  "name": "cais-meeting-ai",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "frontend",
+    "backend"
+  ],
+  "scripts": {
+    "dev": "concurrently -n FRONTEND,BACKEND -c blue,green \"npm run dev --workspace frontend\" \"npm run dev --workspace backend\"",
+    "build": "npm run build --workspace frontend && npm run build --workspace backend",
+    "lint": "npm run lint --workspace frontend && npm run lint --workspace backend",
+    "format": "npm run format --workspace frontend && npm run format --workspace backend",
+    "prisma:generate": "npm run prisma:generate --workspace backend",
+    "prisma:migrate": "npm run prisma:migrate --workspace backend",
+    "prisma:migrate:dev": "npm run prisma:migrate:dev --workspace backend",
+    "prisma:studio": "npm run prisma:studio --workspace backend"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}
