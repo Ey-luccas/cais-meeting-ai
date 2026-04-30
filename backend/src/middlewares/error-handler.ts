@@ -2,8 +2,8 @@ import type { NextFunction, Request, Response } from 'express';
 import { MulterError } from 'multer';
 import { ZodError } from 'zod';
 
-import { env } from '../config/env';
-import { AppError, logger } from '../utils';
+import { AppError } from '../shared/app-error';
+import { logger } from '../shared/logger';
 
 export const errorHandler = (
   error: unknown,
@@ -21,7 +21,7 @@ export const errorHandler = (
 
   if (error instanceof ZodError) {
     res.status(400).json({
-      message: 'Dados inválidos.',
+      message: 'Payload inválido.',
       details: error.flatten()
     });
     return;
@@ -30,7 +30,7 @@ export const errorHandler = (
   if (error instanceof MulterError) {
     if (error.code === 'LIMIT_FILE_SIZE') {
       res.status(400).json({
-        message: `Arquivo excede o limite máximo de ${env.MAX_FILE_SIZE_MB} MB.`
+        message: 'Arquivo excede o tamanho permitido para upload.'
       });
       return;
     }
@@ -44,6 +44,6 @@ export const errorHandler = (
   logger.error('Erro não tratado na API.', error);
 
   res.status(500).json({
-    message: 'Erro interno no servidor.'
+    message: 'Erro interno do servidor.'
   });
 };

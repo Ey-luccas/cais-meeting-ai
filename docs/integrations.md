@@ -1,109 +1,138 @@
-# Integrações Externas - CAIS Meeting AI
+# Integrações de IA - CAIS Meeting AI
 
-## Groq API
+## 1) Visão Geral
 
-Objetivo:
-- converter áudio de reunião em transcrição textual.
+O produto possui duas integrações de IA no fluxo principal:
+- **Groq** para speech-to-text (transcrição de áudio)
+- **DeepSeek** para análise estruturada de reuniões
+
+Objetivo: converter reunião bruta em contexto executável no projeto.
+
+## 2) Groq - Transcrição
+
+### 2.1 Papel na arquitetura
+
+A integração Groq é o provider padrão de transcrição quando `TRANSCRIPTION_ENGINE=GROQ`.
+
+Serviços envolvidos:
+- `audio-processing.service.ts` (FFmpeg, chunking)
+- `groq-transcription.service.ts` (transcrição por chunk)
+- `transcript-merge.service.ts` (merge consolidado)
+- `transcription-router.service.ts` (roteamento de engine)
+
+### 2.2 Pipeline de chunks
+
+Regras principais:
+- target de chunk: ~9 minutos
+- limite por chunk: 25MB
+- redução progressiva do tamanho de segmento quando chunk estoura limite
+- transcrição em ordem de chunk
+- retry por chunk em falha transitória
+- limpeza de temporários ao final
+
+Saída consolidada:
+- `text` completo com marcadores `[HH:MM:SS]`
+- `segments` normalizados
+- `language` por votação de chunks
+- `durationSeconds`
+- `raw` com metadados do merge
+
+### 2.3 Reprocessamento
+
+O serviço suporta reprocessamento unitário de chunk para cenários de falha parcial (`reprocessChunk`).
+
+## 3) DeepSeek - Análise de Reunião
+
+### 3.1 Papel na arquitetura
+
+Após transcrição consolidada, DeepSeek transforma o conteúdo em JSON estruturado para execução.
 
 Serviço:
-- `backend/src/services/groq.service.ts`
-- `backend/src/services/audio-processing.service.ts`
+- `deepseek-meeting-analysis.service.ts`
 
-Comportamento:
-1. valida presença de `GROQ_API_KEY`.
-2. valida existência do arquivo no storage local.
-3. usa `ffmpeg` para dividir o áudio em chunks (padrão: `600s`).
-4. garante chunk abaixo de `GROQ_MAX_CHUNK_MB` com resplit automático quando necessário.
-5. envia cada chunk para `groq.audio.transcriptions.create`.
-6. tenta `response_format: verbose_json` na primeira tentativa.
-7. se o modelo/endpoint não aceitar `verbose_json`, faz fallback sem esse parâmetro.
-8. faz retry por chunk (`GROQ_CHUNK_RETRY_ATTEMPTS`).
-9. concatena transcrições em ordem para gerar transcrição final.
-10. retorna:
-   - `fullText`
-   - `language`
-   - `durationSeconds`
-   - `rawJson`
+### 3.2 Contrato de saída
 
-Erros esperados:
-- chave ausente -> erro de configuração (`500`).
-- arquivo ausente -> erro de validação (`400`).
-- ffmpeg/ffprobe ausentes -> erro de configuração (`500`).
-- falha de integração -> erro de gateway (`502`).
-- resposta vazia -> erro de integração (`502`).
+Campos gerados:
+- `summary`
+- `topics[]`
+- `decisions[]`
+- `actionItems[]`
+  - `title`
+  - `description`
+  - `assignees[]`
+  - `dueDate`
+  - `priority` (`low|medium|high|urgent`)
+- `pendingItems[]`
+- `comments[]`
+- `report`
 
-## DeepSeek API
+### 3.3 Qualidade de parse e robustez
 
-Objetivo:
-- transformar transcrição em notas executivas estruturadas.
+Medidas aplicadas:
+- API compatível com OpenAI via endpoint `/chat/completions`
+- limpeza de blocos markdown quando presentes
+- fallback de extração do primeiro objeto JSON válido
+- validação de schema com `zod`
+- tratamento explícito de erro de API e erro de parse
+
+### 3.4 Contexto adicional de observações
+
+Observações manuais da reunião (`MeetingObservation`) são incluídas no prompt para enriquecer:
+- decisões
+- tarefas
+- pendências
+- relatório final orientado à execução
+
+## 4) Geração Automática de Cards (pós-análise)
 
 Serviço:
-- `backend/src/services/deepseek.service.ts`
+- `ai-card-generator.service.ts`
 
-Comportamento:
-1. valida presença de `DEEPSEEK_API_KEY`.
-2. usa modelo configurado por `DEEPSEEK_MODEL`.
-3. envia prompt técnico para retorno em JSON.
-4. define schema de validação para:
-   - `summary`
-   - `topics`
-   - `decisions`
-   - `actionItems`
-   - `pendingItems`
-   - `comments`
-5. executa validação final com `zod`.
-6. retorna payload pronto para persistência.
+Entrada:
+- `actionItems` retornados pelo DeepSeek
 
-Erros esperados:
-- chave ausente -> erro de configuração (`500`).
-- transcrição vazia -> erro de validação (`400`).
-- limite de quota/rate limit -> erro (`429`).
-- falha na API -> erro de gateway (`502`).
-- JSON inválido/incompleto -> erro de integração (`502`).
+Saída operacional:
+- criação de cards na coluna **A Fazer**
+- `sourceType = AI`
+- vínculo `meetingId`
+- inferência de prioridade e prazo
+- tentativa de match de responsáveis por nome/e-mail
+- deduplicação de itens semelhantes na mesma reunião
+- checklist sugerido para tarefas amplas
 
-## Variáveis de Ambiente
+## 5) Variáveis de Ambiente
 
-Integrações IA:
+### Transcrição
+- `TRANSCRIPTION_ENGINE` (`GROQ` | `LOCAL_FALLBACK`)
 - `GROQ_API_KEY`
-- `GROQ_STT_MODEL` (default: `whisper-large-v3`)
-- `GROQ_MAX_CHUNK_MB` (default: `25`)
-- `AUDIO_CHUNK_SECONDS` (default: `600`)
-- `AUDIO_MIN_CHUNK_SECONDS` (default: `60`)
-- `GROQ_CHUNK_RETRY_ATTEMPTS` (default: `2`)
+- `GROQ_STT_MODEL`
+
+### Análise
 - `DEEPSEEK_API_KEY`
-- `DEEPSEEK_MODEL` (default: `deepseek-chat`)
-- `DEEPSEEK_BASE_URL` (default: `https://api.deepseek.com`)
-- `FFMPEG_BIN` (default: `ffmpeg`)
-- `FFPROBE_BIN` (default: `ffprobe`)
+- `DEEPSEEK_BASE_URL`
+- `DEEPSEEK_MODEL`
 
-Suporte operacional:
-- `UPLOAD_DIR`
-- `MAX_FILE_SIZE_MB`
+### Infra de API
 - `DATABASE_URL`
-- `PORT`
-- `NODE_ENV`
+- `JWT_SECRET`
+- `AUTH_COOKIE_NAME`
 - `CORS_ORIGIN`
+- `UPLOAD_DIR`
 
-Frontend:
-- `NEXT_PUBLIC_API_URL`
+## 6) Tratamento de Falhas
 
-## Comportamento Esperado dos Serviços
+### Falhas de Groq/FFmpeg
+- chunk inválido, arquivo ausente, erro de integração ou limite
+- atualização de status da reunião para `FAILED` em erro irreversível
 
-### Em cenário nominal
+### Falhas de DeepSeek
+- resposta vazia, JSON inválido, schema inválido ou erro de API
+- atualização de status da reunião para `FAILED`
 
-- Upload de áudio finaliza em `UPLOADED`.
-- Transcrição finaliza em `TRANSCRIBED`.
-- Geração de notas finaliza em `COMPLETED`.
-- Dados persistem com consistência em `Meeting`, `Transcript` e `Note`.
+### Resiliência funcional
+- reupload de áudio permite reprocessar reunião
+- pipeline foi desenhado para evolução futura com fila assíncrona
 
-### Em cenário de falha
+## 7) Observação de Compatibilidade
 
-- Backend atualiza reunião para `FAILED`.
-- API retorna erro padronizado com mensagem clara.
-- Frontend exibe feedback de erro e permite nova tentativa.
-
-### Idempotência funcional (MVP)
-
-- Reupload de áudio limpa transcrição/nota antigas da reunião.
-- Transcrição usa `upsert` em `Transcript`.
-- Notas usam `upsert` em `Note`.
+O fluxo principal de produção inicial está padronizado em **Groq + DeepSeek**.

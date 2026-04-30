@@ -3,25 +3,30 @@ import { Manrope, Space_Grotesk } from 'next/font/google';
 
 import './globals.css';
 
-const spaceGrotesk = Space_Grotesk({
-  subsets: ['latin'],
-  variable: '--font-space-grotesk'
-});
-
 const manrope = Manrope({
   subsets: ['latin'],
   variable: '--font-manrope'
 });
 
+const spaceGrotesk = Space_Grotesk({
+  subsets: ['latin'],
+  variable: '--font-space-grotesk'
+});
+
 export const metadata: Metadata = {
-  title: 'CAIS Meeting AI',
-  description: 'Plataforma de reuniões com IA para transcrição, análise e execução operacional.'
+  title: 'Cais Teams',
+  description:
+    'Plataforma colaborativa de projetos e reuniões com IA para equipes organizarem decisões, tarefas e execução.'
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }): JSX.Element {
+export default function RootLayout({
+  children
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
   return (
-    <html lang="pt-BR" suppressHydrationWarning>
-      <body className={`${spaceGrotesk.variable} ${manrope.variable} font-body antialiased`}>
+    <html lang="pt-BR">
+      <body className={`${manrope.variable} ${spaceGrotesk.variable} font-body text-[#0B2239]`}>
         {children}
       </body>
     </html>

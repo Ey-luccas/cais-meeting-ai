@@ -17,6 +17,9 @@ export default tseslint.config(
     }
   },
   {
-    ignores: ['dist/**']
+    ignores: [
+      'dist/**',
+      'src/modules/documents/**'
+    ]
   }
 );

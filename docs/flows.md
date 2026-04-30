@@ -1,82 +1,161 @@
-# Fluxos de Processamento - CAIS Meeting AI
+# Fluxos do Produto - CAIS Meeting AI
 
-## Fluxo de Criação de Reunião
+## 1) Onboarding e Sessão
 
-Objetivo: registrar metadados iniciais da reunião.
+### 1.1 Registro inicial (`POST /auth/register`)
 
-1. Frontend envia `POST /meetings` com `title`, `description` e `tags` (opcional).
-2. Backend valida os dados.
-3. Backend cria registro em `Meeting` com status inicial `PENDING`.
-4. Backend retorna objeto completo da reunião (incluindo relações vazias).
+Objetivo: criar workspace da organização com primeiro usuário OWNER.
 
-Resultado esperado:
-- reunião criada e pronta para receber áudio.
+Passos:
+1. validar payload de organização e usuário;
+2. criar `User`;
+3. criar `Organization`;
+4. criar `OrganizationMember` com papel `OWNER`;
+5. emitir JWT e persistir cookie;
+6. retornar sessão com organização ativa.
 
-## Fluxo de Upload de Áudio
+### 1.2 Login (`POST /auth/login`)
 
-Objetivo: associar mídia à reunião no MVP (storage local).
+Passos:
+1. validar credenciais;
+2. carregar memberships do usuário;
+3. selecionar organização ativa (slug opcional);
+4. emitir JWT e atualizar cookie;
+5. retornar contexto de sessão.
 
-1. Frontend envia `POST /meetings/:id/upload` com `multipart/form-data` e campo `audio`.
-2. Multer valida tipo e tamanho do arquivo.
-3. Backend salva o arquivo em `UPLOAD_DIR`.
-4. Backend remove transcrição/notas anteriores da mesma reunião (quando houver reupload).
-5. Backend atualiza:
-   - `audioPath`
-   - `status = UPLOADED`
-   - `durationSeconds = null`
-6. Backend retorna reunião atualizada.
+### 1.3 Sessão atual (`GET /auth/me`)
 
-Resultado esperado:
-- áudio disponível para transcrição.
+Passos:
+1. validar token;
+2. revalidar membership;
+3. retornar usuário + organização ativa + organizações acessíveis.
 
-## Fluxo de Transcrição
+## 2) Gestão de Organização e Equipe
 
-Objetivo: converter áudio em texto estruturado.
+### 2.1 Organização
+- `GET /organization`
+- `PATCH /organization`
 
-1. Frontend envia `POST /meetings/:id/transcribe`.
-2. Backend valida existência da reunião e do arquivo.
-3. Backend muda status para `TRANSCRIBING`.
-4. `audio-processing.service` divide o áudio em chunks (`AUDIO_CHUNK_SECONDS`, padrão `600s`).
-5. Cada chunk é transcrito separadamente no Groq (com retry por chunk).
-6. Backend ordena por índice do chunk e faz `merge_transcripts`.
-7. Serviço Groq retorna transcrição consolidada:
-   - `fullText`
-   - `language`
-   - `durationSeconds`
-   - `rawJson`
-8. Backend faz `upsert` de `Transcript`.
-9. Backend remove `Note` antiga (se existir).
-10. Backend atualiza reunião para `TRANSCRIBED`.
-11. Em erro, backend define status `FAILED`.
+### 2.2 Equipe
+- `GET /organization/members`
+- `POST /organization/members`
+- `PATCH /organization/members/:id`
+- `DELETE /organization/members/:id`
 
-Resultado esperado:
-- transcrição persistida e pronta para análise com DeepSeek.
+Regra de autorização:
+- somente `OWNER` e `ADMIN` gerenciam equipe.
 
-## Fluxo de Geração de Notas
+## 3) Fluxo de Projeto
 
-Objetivo: transformar transcrição em saída executiva acionável.
+### 3.1 Criação de projeto (`POST /projects`)
 
-1. Frontend envia `POST /meetings/:id/generate-notes`.
-2. Backend valida existência de `Transcript`.
-3. Backend muda status para `PROCESSING_AI`.
-4. Serviço DeepSeek gera JSON estruturado:
-   - `summary`
-   - `topics`
-   - `decisions`
-   - `tasks` (mapeado para `actionItems`)
-   - `pending_items` (mapeado para `pendingItems`)
-   - `notes` (mapeado para `comments`)
-5. Backend faz `upsert` em `Note`.
-6. Backend atualiza reunião para `COMPLETED`.
-7. Em erro, backend define status `FAILED`.
+Passos:
+1. validar dados do projeto;
+2. criar `Project`;
+3. vincular criador como `ProjectMember` (`OWNER`);
+4. criar `Board` padrão;
+5. criar colunas padrão:
+   - A Fazer
+   - Em Andamento
+   - Em Revisão
+   - Concluído
 
-Resultado esperado:
-- reunião finalizada com notas inteligentes persistidas.
+### 3.2 Operação do projeto
+- listagem e detalhe (`GET /projects`, `GET /projects/:id`)
+- atualização e exclusão (`PATCH /projects/:id`, `DELETE /projects/:id`)
+- gestão de membros do projeto (`/projects/:id/members`)
+- arquivos (`/projects/:id/files`)
+- relatório consolidado (`/projects/:id/reports`)
 
-## Fluxo Unificado (Atalho)
+## 4) Fluxo de Reunião
 
-Endpoint opcional:
-- `POST /meetings/:id/process`
+### 4.1 Criação (`POST /projects/:id/meetings`)
 
-Comportamento:
-- executa transcrição e geração de notas em sequência no backend.
+Passos:
+1. validar acesso ao projeto;
+2. criar reunião com `status = PENDING`;
+3. opcionalmente receber áudio já na criação.
+
+### 4.2 Upload/reupload de áudio (`POST /meetings/:meetingId/upload`)
+
+Passos:
+1. validar arquivo e permissões;
+2. persistir mídia localmente;
+3. atualizar reunião para `UPLOADED`;
+4. limpar transcrição/análise anteriores quando aplicável.
+
+### 4.3 Observações manuais (`POST /meetings/:meetingId/observations`)
+
+Passos:
+1. registrar `timestampSeconds`, `type`, `content` e autor;
+2. persistir `MeetingObservation`;
+3. disponibilizar observações para leitura na tela da reunião;
+4. usar observações como contexto adicional na análise DeepSeek.
+
+## 5) Pipeline de Transcrição com Chunks (Groq)
+
+Entrada: `POST /meetings/:meetingId/process` (pipeline completo).
+
+Etapas:
+1. validar reunião e presença de áudio;
+2. definir `status = TRANSCRIBING`;
+3. dividir áudio com FFmpeg em chunks (~9 min alvo, limite 25MB por chunk);
+4. transcrever cada chunk via Groq em ordem;
+5. aplicar retry por chunk em falha transitória;
+6. consolidar transcrição com marcadores `[HH:MM:SS]` por início de chunk;
+7. persistir `Transcript` com texto completo, idioma e payload bruto;
+8. definir `status = TRANSCRIBED`.
+
+Falhas:
+- falha grave em chunk/processamento leva reunião para `FAILED`.
+
+## 6) Pipeline de Análise (DeepSeek)
+
+Após transcrição:
+1. definir `status = PROCESSING_AI`;
+2. enviar prompt com transcrição + observações manuais;
+3. forçar resposta JSON estruturada;
+4. validar e normalizar saída (`summary`, `topics`, `decisions`, `actionItems`, `pendingItems`, `comments`, `report`);
+5. persistir `MeetingNote`;
+6. avançar para criação automática de cards;
+7. finalizar reunião com `status = COMPLETED`.
+
+## 7) Geração Automática de Cards
+
+Fonte: `actionItems` retornados na análise.
+
+Passos:
+1. localizar coluna `A Fazer` do board do projeto;
+2. deduplicar itens óbvios dentro da mesma reunião;
+3. criar card com:
+   - `sourceType = AI`
+   - `meetingId` de origem
+   - prioridade e prazo inferidos (quando presentes)
+4. tentar correspondência de responsáveis citados com membros do projeto;
+5. quando aplicável, gerar checklist sugerido;
+6. salvar sugestões de responsáveis não resolvidas no conteúdo do card.
+
+## 8) Fluxo de Board Manual
+
+Principais operações:
+- criar/editar/excluir card;
+- mover card entre colunas;
+- atribuir responsáveis;
+- checklist e toggle de item;
+- comentários;
+- anexos e links;
+- etiquetas.
+
+O board integra duas origens:
+- execução manual do time (`MANUAL`)
+- execução sugerida por IA (`AI`).
+
+## 9) Fluxo de Relatórios
+
+`GET /projects/:id/reports` consolida:
+- total de reuniões no período;
+- tópicos recorrentes;
+- decisões recentes;
+- tarefas abertas vindas de reuniões;
+- pendências recorrentes;
+- resumo por período (buckets temporais).

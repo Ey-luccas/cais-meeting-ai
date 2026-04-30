@@ -1,243 +1,274 @@
 # CAIS Meeting AI
 
-Plataforma fullstack para transformar reuniões em memória operacional: captura de áudio, transcrição com Groq, análise com DeepSeek e consolidação estruturada no MySQL.
+Plataforma SaaS para gestão de projetos e reuniões com IA, com foco em execução operacional: transcrição automática, análise estruturada, geração de tarefas e acompanhamento em board Kanban colaborativo.
 
-## Visão Geral
+## Visão do Produto
 
-O **CAIS Meeting AI** centraliza o ciclo pós-reunião em uma experiência web institucional:
-- criação e gestão de reuniões
-- upload ou gravação de áudio
-- transcrição automática
-- geração de notas executivas (resumo, tópicos, decisões, tarefas, pendências e comentários)
-- histórico consultável com status de processamento
+O **CAIS Meeting AI** centraliza trabalho de times em um único ambiente:
+- contexto organizacional multi-tenant
+- colaboração por papéis
+- projetos com reuniões, arquivos, relatórios e board
+- IA aplicada ao ciclo completo pós-reunião
 
-## Proposta de Valor
+Objetivo principal: transformar reuniões em decisões rastreáveis e trabalho executável.
 
-- Reduzir retrabalho na documentação de reuniões.
-- Aumentar velocidade de tomada de decisão com síntese automática.
-- Estruturar memória organizacional com dados persistidos e rastreáveis.
-- Padronizar o fluxo operacional de captura -> análise -> execução.
+## Arquitetura Multi-tenant
 
-## Stack Utilizada
+Cada sessão autenticada opera dentro de uma organização ativa.
+
+- **Organization**: tenant principal (workspace)
+- **User**: identidade global
+- **OrganizationMember**: vínculo usuário-organização com papel
+- **Project**: unidade de execução dentro da organização
+- **ProjectMember**: controle de acesso por projeto
+
+### Papéis e Permissões
+
+Papéis suportados:
+- `OWNER`
+- `ADMIN`
+- `MEMBER`
+- `VIEWER`
+
+Regras gerais:
+- `OWNER` e `ADMIN`: governança da organização e gestão de equipe
+- `MEMBER`: operação de projetos, reuniões e board
+- `VIEWER`: leitura
+
+## Domínios do Produto
+
+### Organização e Colaboradores
+- gestão de dados da organização
+- listagem, adição, troca de papel e remoção de membros
+- base para fluxo de convite (evolução futura)
+
+### Projetos
+Cada organização pode ter vários projetos.
+Cada projeto concentra:
+- membros
+- reuniões
+- board Kanban
+- arquivos
+- relatórios consolidados
+
+Ao criar projeto, o board padrão é provisionado com colunas:
+- `A Fazer`
+- `Em Andamento`
+- `Em Revisão`
+- `Concluído`
+
+### Reuniões com IA
+Cada reunião pertence a um projeto e suporta:
+- criação manual
+- upload de áudio
+- observações manuais com timestamp
+- pipeline de transcrição e análise
+
+Saída da IA:
+- resumo
+- tópicos
+- decisões
+- tarefas
+- pendências
+- comentários
+- relatório
+
+### Board Kanban Inteligente + Manual
+Board no estilo Trello com:
+- cards manuais e gerados por IA
+- movimentação entre colunas
+- múltiplos responsáveis
+- checklist
+- comentários
+- anexos
+- links
+- etiquetas
+- prioridade
+- data limite
+
+## IA no CAIS
+
+### Transcrição (Groq)
+- provider principal: **Groq**
+- pipeline robusto para áudios longos com **FFmpeg**
+- split em chunks para respeitar limites de upload
+- transcrição por chunk + merge em ordem
+- estrutura pronta para fallback local futuro
+
+### Análise (DeepSeek)
+- provider de análise: **DeepSeek** (API compatível com OpenAI)
+- geração de JSON estruturado com contexto executivo
+- parse robusto + tratamento de falhas de API/parse
+- persistência de análise em `MeetingNote`
+
+## Schema Principal (Prisma + MySQL)
+
+Principais entidades:
+- `Organization`, `User`, `OrganizationMember`
+- `Project`, `ProjectMember`
+- `Meeting`, `Transcript`, `MeetingNote`, `MeetingObservation`
+- `ProjectFile`
+- `Board`, `BoardColumn`, `Card`
+- `CardAssignee`, `CardChecklist`, `CardChecklistItem`
+- `CardComment`, `CardAttachment`, `CardLink`
+- `CardLabel`, `CardLabelRelation`
+
+Enums principais:
+- `OrganizationRole`, `ProjectRole`
+- `MeetingStatus`, `ObservationType`
+- `CardSourceType`, `CardPriority`
+
+## Fluxo Completo da Reunião
+
+1. Usuário cria reunião no projeto.
+2. Áudio é enviado (`upload`) ou informado no momento da criação.
+3. Sistema define status e prepara processamento.
+4. Áudio é dividido em chunks (quando necessário).
+5. Cada chunk é transcrito via Groq.
+6. Transcrições são mescladas em texto final.
+7. DeepSeek analisa transcrição + observações manuais.
+8. Resultado estruturado é salvo em `MeetingNote`.
+9. `actionItems` podem gerar cards automáticos no board.
+10. Reunião finaliza com status `COMPLETED` (ou `FAILED` em erro).
+
+## Criação Automática de Cards
+
+A partir dos `actionItems` da análise:
+- cards são criados automaticamente na coluna **A Fazer**
+- `sourceType = AI`
+- vínculo com `meetingId`
+- prioridade e prazo inferidos quando disponíveis
+- tentativa de correspondência de responsáveis com membros do projeto
+- deduplicação básica de itens óbvios da mesma reunião
+
+## Páginas Principais (Frontend)
+
+- `/login`
+- `/register`
+- `/dashboard`
+- `/team`
+- `/projects`
+- `/projects/[id]`
+- `/projects/[id]/meetings`
+- `/projects/[id]/meetings/new`
+- `/projects/[id]/meetings/[meetingId]`
+- `/projects/[id]/board`
+- `/projects/[id]/files`
+- `/projects/[id]/reports`
+
+## Endpoints Principais (Backend)
+
+Base: `http://localhost:4000/api/v1` (padrão; depende de `PORT`)
+
+### Auth
+- `POST /auth/register`
+- `POST /auth/login`
+- `GET /auth/me`
+
+### Organization
+- `GET /organization`
+- `PATCH /organization`
+
+### Team
+- `GET /organization/members`
+- `POST /organization/members`
+- `PATCH /organization/members/:id`
+- `DELETE /organization/members/:id`
+
+### Projects
+- `POST /projects`
+- `GET /projects`
+- `GET /projects/:id`
+- `PATCH /projects/:id`
+- `DELETE /projects/:id`
+- `GET /projects/:id/members`
+- `POST /projects/:id/members`
+- `PATCH /projects/:id/members/:memberId`
+- `DELETE /projects/:id/members/:memberId`
+- `POST /projects/:id/files`
+- `GET /projects/:id/files`
+- `DELETE /projects/:id/files/:fileId`
+- `GET /projects/:id/reports`
+
+### Meetings
+- `POST /projects/:id/meetings`
+- `GET /projects/:id/meetings`
+- `GET /meetings/:meetingId`
+- `DELETE /meetings/:meetingId`
+- `POST /meetings/:meetingId/upload`
+- `POST /meetings/:meetingId/observations`
+- `POST /meetings/:meetingId/process`
+
+### Board
+- `GET /projects/:id/board`
+- `POST /projects/:id/board/cards`
+- `PATCH /board/cards/:id`
+- `DELETE /board/cards/:id`
+- `POST /board/cards/:id/checklists`
+- `POST /board/checklist-items/:id/toggle`
+- `POST /board/cards/:id/comments`
+- `POST /board/cards/:id/attachments`
+- `POST /board/cards/:id/links`
+- `POST /board/cards/:id/assignees`
+- `POST /board/cards/:id/labels`
+
+## Stack Técnica
 
 ### Frontend
-- `Next.js 14` (App Router)
-- `TypeScript`
-- `Tailwind CSS`
-- `shadcn/ui`
-- `Radix UI`
+- Next.js + TypeScript
+- Tailwind CSS
+- shadcn/ui + Radix UI
 
 ### Backend
-- `Node.js`
-- `Express`
-- `TypeScript`
-- `Prisma ORM`
-- `Multer` (upload local)
-- `Groq SDK` (speech-to-text)
-- `DeepSeek API` (análise textual)
+- Node.js + Express + TypeScript
+- arquitetura modular (`modules`, `services`, `middlewares`)
 
-### Banco e Infra
-- `MySQL 8`
-- `Docker Compose` (MySQL + Adminer)
+### Dados
+- MySQL
+- Prisma ORM
 
-## Arquitetura (Resumo)
-
-Monorepo com separação explícita de responsabilidades:
-- `frontend/`: interface institucional e operacional
-- `backend/`: API REST modular, integração com IA e persistência
-- `MySQL + Prisma`: armazenamento de reuniões, transcrições, notas e tags
-
-Fluxo principal:
-1. Frontend envia comandos REST para backend.
-2. Backend persiste reunião e arquivo de áudio local.
-3. Backend divide áudio em chunks e transcreve cada parte com Groq.
-4. Backend gera notas estruturadas com DeepSeek.
-5. Backend atualiza status e retorna dados consolidados.
-
-## Funcionalidades Principais
-
-- Landing page institucional premium.
-- Dashboard com indicadores e atividade recente.
-- CRUD básico de reuniões.
-- Upload manual de áudio (`mp3`, `wav`, `m4a`, `webm`).
-- Gravação de áudio no navegador (`MediaRecorder API`).
-- Transcrição de áudio com Groq.
-- Geração de notas com DeepSeek.
-- Tela de detalhe com:
-  - player de áudio
-  - transcrição completa
-  - resumo
-  - tópicos
-  - decisões
-  - tarefas
-  - pendências
-  - comentários
-- Copiar conteúdos-chave diretamente da interface.
-
-## Estrutura de Pastas
-
-```text
-cais-meeting-ai/
-├── frontend/
-│   ├── src/
-│   │   ├── app/
-│   │   ├── components/
-│   │   ├── hooks/
-│   │   ├── lib/
-│   │   ├── modules/
-│   │   └── types/
-│   └── .env.example
-├── backend/
-│   ├── prisma/
-│   ├── src/
-│   │   ├── config/
-│   │   ├── controllers/
-│   │   ├── middlewares/
-│   │   ├── routes/
-│   │   ├── services/
-│   │   ├── types/
-│   │   └── utils/
-│   └── .env.example
-├── docs/
-├── docker-compose.yml
-├── .env.example
-└── README.md
-```
-
-## Variáveis de Ambiente
-
-### Frontend (`frontend/.env.local`)
-
-| Variável | Descrição | Exemplo |
-|---|---|---|
-| `NEXT_PUBLIC_API_URL` | URL base da API REST | `http://localhost:4000/api/v1` |
-| `NEXT_PUBLIC_MAX_FILE_SIZE_MB` | Limite de upload exibido na UI | `200` |
-
-### Backend (`backend/.env`)
-
-| Variável | Descrição | Exemplo |
-|---|---|---|
-| `NODE_ENV` | Ambiente de execução | `development` |
-| `PORT` | Porta do backend | `4000` |
-| `DATABASE_URL` | Conexão MySQL para Prisma | `mysql://root:root@localhost:3306/cais_meeting_ai` |
-| `CORS_ORIGIN` | Origem permitida para o frontend | `http://localhost:3000` |
-| `UPLOAD_DIR` | Diretório local de uploads | `uploads` |
-| `MAX_FILE_SIZE_MB` | Limite de upload no backend em MB | `200` |
-| `FFMPEG_BIN` | Binário do ffmpeg | `ffmpeg` |
-| `FFPROBE_BIN` | Binário do ffprobe | `ffprobe` |
-| `GROQ_API_KEY` | Chave da API Groq | `...` |
-| `GROQ_STT_MODEL` | Modelo STT Groq | `whisper-large-v3` |
-| `GROQ_MAX_CHUNK_MB` | Limite por chunk para Groq | `25` |
-| `AUDIO_CHUNK_SECONDS` | Duração alvo de cada chunk | `600` |
-| `AUDIO_MIN_CHUNK_SECONDS` | Menor duração permitida para resplit | `60` |
-| `GROQ_CHUNK_RETRY_ATTEMPTS` | Tentativas extras por chunk | `2` |
-| `DEEPSEEK_API_KEY` | Chave da API DeepSeek | `...` |
-| `DEEPSEEK_MODEL` | Modelo DeepSeek | `deepseek-chat` |
-| `DEEPSEEK_BASE_URL` | URL base da API DeepSeek | `https://api.deepseek.com` |
-
-## Instalação
+## Setup Rápido
 
 Pré-requisitos:
-- `Node.js >= 20`
-- `npm >= 10`
-- `Docker + Docker Compose`
-- `ffmpeg` e `ffprobe` instalados no sistema (para transcrição de áudios longos)
+- Node.js 20+
+- npm 10+
+- Docker + Docker Compose
 
-1. Instale as dependências:
+Instalação:
 
 ```bash
 npm install
-```
-
-2. Configure os ambientes:
-
-```bash
 cp .env.example .env
 cp backend/.env.example backend/.env
 cp frontend/.env.example frontend/.env.local
-```
-
-3. Suba o banco local:
-
-```bash
 docker compose up -d
-```
-
-4. Gere Prisma Client e rode migrações:
-
-```bash
-npm run prisma:generate --workspace backend
-npm run prisma:migrate --workspace backend
-```
-
-Para criar novas migrações em ambiente de desenvolvimento:
-
-```bash
 npm run prisma:migrate:dev --workspace backend
-```
-
-## Como Rodar
-
-### Frontend + Backend juntos
-
-```bash
+npm run prisma:generate --workspace backend
 npm run dev
 ```
 
-### Apenas frontend
+## Variáveis de Ambiente (Backend)
 
-```bash
-npm run dev --workspace frontend
-```
+- `DATABASE_URL`
+- `JWT_SECRET`
+- `AUTH_COOKIE_NAME`
+- `GROQ_API_KEY`
+- `DEEPSEEK_API_KEY`
+- `DEEPSEEK_BASE_URL`
+- `DEEPSEEK_MODEL`
+- `TRANSCRIPTION_ENGINE` (`GROQ` | `LOCAL_FALLBACK`)
 
-### Apenas backend
+## Roadmap Futuro
 
-```bash
-npm run dev --workspace backend
-```
+- convite formal de colaboradores por e-mail
+- múltiplas organizações ativas por usuário com troca rápida de contexto
+- fallback local de transcrição em produção
+- processamento assíncrono com fila (jobs/workers)
+- webhooks e integrações externas (Slack, PM tools)
+- trilha de auditoria por ação
+- analytics avançado de produtividade por projeto/período
+- templates de relatório e playbooks por tipo de reunião
 
-### Build e qualidade
+---
 
-```bash
-npm run lint
-npm run build
-```
-
-## Fluxo de Processamento da Reunião
-
-1. `POST /meetings` cria a reunião (`PENDING`).
-2. `POST /meetings/:id/upload` envia áudio (`UPLOADED`).
-3. `POST /meetings/:id/transcribe` divide o áudio em chunks e roda Groq por parte (`TRANSCRIBING` -> `TRANSCRIBED`).
-4. `POST /meetings/:id/generate-notes` roda DeepSeek (`PROCESSING_AI` -> `COMPLETED`).
-5. Em erro de processamento, status final: `FAILED`.
-
-Status suportados:
-- `PENDING`
-- `UPLOADED`
-- `TRANSCRIBING`
-- `TRANSCRIBED`
-- `PROCESSING_AI`
-- `COMPLETED`
-- `FAILED`
-
-## Roadmap do MVP
-
-### Concluído
-- Base fullstack com frontend e backend separados.
-- Persistência MySQL com Prisma.
-- Integração Groq + DeepSeek.
-- Fluxo fim a fim de processamento.
-- Interface institucional com landing, dashboard e gestão de reuniões.
-
-### Próximos passos
-1. Fila assíncrona para processamento (ex.: BullMQ/Redis).
-2. Armazenamento de mídia em cloud object storage.
-3. Autenticação e controle de acesso por organização.
-4. Busca semântica e filtros avançados de histórico.
-5. Observabilidade (tracing, métricas e auditoria de prompts IA).
-
-## Documentação Complementar
-
-- `docs/architecture.md`
-- `docs/api.md`
-- `docs/product-scope.md`
+CAIS Meeting AI foi desenhado para unir contexto, decisão e execução em uma única plataforma operacional com IA.

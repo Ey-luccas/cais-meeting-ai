@@ -1,88 +1,105 @@
 # Arquitetura - CAIS Meeting AI
 
-## Visão Geral da Solução
+## 1) Visão Geral
 
-O CAIS Meeting AI é um monorepo fullstack com separação clara entre interface, API e persistência.
+O CAIS Meeting AI é uma plataforma SaaS de execução colaborativa baseada em reuniões com IA.
 
-Componentes principais:
-- `frontend` (Next.js): experiência web institucional e operacional.
-- `backend` (Express): API REST com regras de negócio e integrações IA.
-- `MySQL` (Prisma): persistência de reuniões, transcrições, notas e tags.
-- armazenamento local de arquivos de áudio no MVP.
+Arquitetura em monorepo com separação por camadas:
+- `frontend/` (Next.js + TypeScript): experiência web do produto.
+- `backend/` (Express + TypeScript): API REST, regras de negócio e orquestração de IA.
+- `MySQL` + `Prisma`: persistência relacional multi-tenant.
+- `uploads/` local (MVP): áudio e anexos.
 
-## Frontend
+## 2) Multi-tenancy por Organização
 
-Stack:
-- Next.js (App Router)
-- TypeScript
-- Tailwind CSS
-- shadcn/ui + Radix UI
+Isolamento de dados por organização (`Organization`).
 
-Responsabilidades:
-- landing institucional do produto.
-- dashboard com indicadores e atividade recente.
-- listagem, criação e detalhe de reuniões.
-- gravação de áudio no navegador (MediaRecorder).
-- upload de áudio e acionamento de transcrição/notas via API.
+Princípios:
+- cada requisição autenticada carrega contexto `req.auth` (`userId`, `organizationId`, `memberId`, `role`);
+- acesso a projetos/reuniões/board sempre validado pelo `organizationId` ativo;
+- autorização combinada por papel organizacional e, quando aplicável, papel no projeto.
 
-Organização principal:
-- `frontend/src/app`: rotas e páginas.
-- `frontend/src/components`: UI e blocos de domínio.
-- `frontend/src/modules/meetings`: camada de consumo REST do domínio.
-- `frontend/src/hooks`: estado de tela e carregamento.
-- `frontend/src/lib`: utilitários e API client.
+Modelos de tenancy:
+- `Organization` (tenant)
+- `OrganizationMember` (papel dentro da organização)
+- `Project` (escopo operacional dentro da organização)
+- `ProjectMember` (papel por projeto)
 
-## Backend
+## 3) Módulos de Backend
 
-Stack:
-- Node.js + Express
-- TypeScript
-- Prisma ORM
+Estrutura base em `backend/src/modules`:
+- `auth`: registro, login, sessão e contexto autenticado.
+- `organizations`: organização ativa e gestão de colaboradores.
+- `projects`: CRUD de projetos, membros por projeto e board inicial.
+- `meetings`: ciclo da reunião (criação, upload, observações, processamento IA).
+- `board`: Kanban estilo Trello (cards, checklist, comentários, anexos, links, labels, assignees).
+- `files`: arquivos do projeto.
+- `reports`: visão consolidada de reuniões e execução.
 
-Responsabilidades:
-- expor endpoints REST de reuniões.
-- validar entrada e tratar erros globalmente.
-- receber uploads com Multer.
-- orquestrar pipeline de chunking (`ffmpeg`) + Groq + DeepSeek.
-- persistir dados no MySQL e atualizar status de processamento.
+Camadas transversais:
+- `middlewares/`: autenticação, autorização e tratamento de erro.
+- `services/transcription/`: pipeline de transcrição com chunking.
+- `services/ai/`: análise DeepSeek e geração automática de cards.
+- `shared/`: segurança, upload, storage, logger, erros.
 
-Organização principal:
-- `backend/src/config`: ambiente e Prisma client.
-- `backend/src/controllers`: camada HTTP.
-- `backend/src/services`: regras de negócio + integrações IA.
-- `backend/src/routes`: roteamento REST.
-- `backend/src/middlewares`: not-found e error handler.
-- `backend/src/utils`: upload/storage, helpers e erros.
+## 4) Fronteiras de Responsabilidade
 
-## Banco de Dados
+Frontend:
+- navegação por contexto (organização e projeto);
+- consumo da API com sessão persistente;
+- páginas principais: Dashboard, Team, Projects, Meetings, Board, Files, Reports.
 
-Tecnologia:
-- MySQL 8
-- Prisma ORM
+Backend:
+- validação de payload e parâmetros;
+- aplicação de regras de permissão;
+- persistência relacional;
+- orquestração de processamento de reunião (transcrição + análise + geração de cards).
 
-Modelos centrais:
-- `Meeting`
-- `Transcript`
-- `Note`
-- `MeetingTag`
+Banco:
+- consistência transacional em operações críticas (ex.: criação de projeto + board default, geração de cards de IA);
+- uso de enums para estados e papéis.
+
+## 5) Reuniões com IA (Arquitetura de Processamento)
+
+Pipeline:
+1. reunião criada e áudio enviado;
+2. transcrição roteada por `TranscriptionRouterService` (`GROQ` ou `LOCAL_FALLBACK`);
+3. para Groq: chunking com FFmpeg + transcrição por chunk + merge com marcadores de tempo;
+4. análise com DeepSeek e saída JSON estruturada;
+5. persistência em `Transcript` e `MeetingNote`;
+6. criação automática de cards (origem `AI`) a partir de `actionItems`.
+
+Estados de `MeetingStatus`:
+- `PENDING` → `UPLOADED` → `TRANSCRIBING` → `TRANSCRIBED` → `PROCESSING_AI` → `COMPLETED`
+- em falha: `FAILED`
+
+## 6) Board Kanban (Essencial Trello)
+
+Cada projeto possui um board único com colunas padrão:
+- A Fazer
+- Em Andamento
+- Em Revisão
+- Concluído
+
+Recursos do card:
+- título, descrição, prioridade, prazo;
+- múltiplos responsáveis;
+- checklist e itens;
+- comentários;
+- anexos e links;
+- etiquetas;
+- origem (`MANUAL` ou `AI`).
+
+## 7) Padrões de Qualidade e Evolução
 
 Padrões adotados:
-- `MeetingStatus` como enum para governar o pipeline.
-- campos JSON em `Note` para flexibilidade de evolução das saídas de IA.
-- relações 1:1 para `Meeting -> Transcript` e `Meeting -> Note`.
-- relação 1:N para `Meeting -> MeetingTag`.
+- validação de entrada com `zod`;
+- erros padronizados (`AppError`);
+- autenticação central por JWT (cookie HTTP-only e bearer);
+- design modular para escalar domínios.
 
-## Serviços Externos
-
-### Groq API
-- usada para speech-to-text no backend.
-- áudio longo é dividido em chunks antes do envio para respeitar o limite por requisição.
-- tentativa inicial com `response_format=verbose_json`.
-- fallback automático sem `verbose_json` quando necessário.
-- retorno consolidado: texto, idioma, duração e payload bruto.
-
-### DeepSeek API
-- usada para análise textual da transcrição.
-- resposta em JSON estruturado, validada por schema no backend.
-- validação adicional via `zod` antes de persistir.
-- saída esperada (normalizada): `summary`, `topics`, `decisions`, `actionItems`, `pendingItems`, `comments`.
+Pronto para evolução:
+- fila assíncrona para processamento pesado;
+- fallback local de transcrição em produção;
+- trilha de auditoria por organização/projeto;
+- integrações externas de produtividade.

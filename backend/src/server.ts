@@ -1,10 +1,11 @@
 import { app } from './app';
 import { env } from './config/env';
 import { prisma } from './config/prisma';
-import { ensureUploadDir, logger } from './utils';
+import { logger } from './shared/logger';
+import { ensureStorageDirectories } from './shared/storage';
 
 const bootstrap = async (): Promise<void> => {
-  await ensureUploadDir();
+  await ensureStorageDirectories();
   await prisma.$connect();
 
   const server = app.listen(env.PORT, () => {

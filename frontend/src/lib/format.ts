@@ -1,33 +1,32 @@
-import type { MeetingStatus } from '@/types/meeting';
-
-export const formatDateTime = (value: string): string => {
-  return new Intl.DateTimeFormat('pt-BR', {
+export const formatDateTime = (value: string): string =>
+  new Intl.DateTimeFormat('pt-BR', {
     dateStyle: 'short',
     timeStyle: 'short'
   }).format(new Date(value));
-};
 
-export const formatDuration = (seconds: number | null): string => {
-  if (!seconds || seconds <= 0) {
-    return 'N/A';
+export const formatBytes = (sizeBytes: number): string => {
+  if (sizeBytes < 1024) {
+    return `${sizeBytes} B`;
   }
 
-  const minutes = Math.floor(seconds / 60)
-    .toString()
-    .padStart(2, '0');
-  const remainingSeconds = Math.floor(seconds % 60)
-    .toString()
-    .padStart(2, '0');
+  const units = ['KB', 'MB', 'GB'];
+  let value = sizeBytes / 1024;
+  let index = 0;
 
-  return `${minutes}:${remainingSeconds}`;
+  while (value >= 1024 && index < units.length - 1) {
+    value /= 1024;
+    index += 1;
+  }
+
+  return `${value.toFixed(1)} ${units[index]}`;
 };
 
-export const statusLabel: Record<MeetingStatus, string> = {
+export const meetingStatusLabel: Record<string, string> = {
   PENDING: 'Pendente',
-  UPLOADED: 'Upload concluído',
+  UPLOADED: 'Áudio enviado',
   TRANSCRIBING: 'Transcrevendo',
   TRANSCRIBED: 'Transcrito',
   PROCESSING_AI: 'Processando IA',
-  COMPLETED: 'Concluído',
+  COMPLETED: 'Concluída',
   FAILED: 'Falhou'
 };

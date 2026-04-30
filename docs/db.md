@@ -1,116 +1,147 @@
 # Banco de Dados - CAIS Meeting AI
 
-## Modelagem MySQL
+## 1) Stack e Objetivo
 
-Banco relacional com Prisma ORM, orientado ao ciclo completo de reunião.
+- Banco: **MySQL**
+- ORM: **Prisma**
+- Estratégia: modelo relacional orientado a multi-tenancy por organização.
 
-Tecnologia:
-- MySQL 8
-- Prisma Client
+Objetivo do schema: suportar colaboração, execução de projetos e ciclo completo de reunião com IA.
 
-Enum de domínio:
-- `MeetingStatus`
-  - `PENDING`
-  - `UPLOADED`
-  - `TRANSCRIBING`
-  - `TRANSCRIBED`
-  - `PROCESSING_AI`
-  - `COMPLETED`
-  - `FAILED`
+## 2) Entidades Principais
 
-## Entidades
+### Núcleo Multi-tenant
+- `Organization`
+- `User`
+- `OrganizationMember`
 
-### Meeting
+### Projetos
+- `Project`
+- `ProjectMember`
 
-Campos principais:
-- `id` (UUID, PK)
-- `title`
-- `description` (Text, opcional)
-- `audioPath` (opcional)
-- `durationSeconds` (opcional)
-- `status` (enum)
-- `createdAt`
-- `updatedAt`
+### Reuniões e IA
+- `Meeting`
+- `Transcript`
+- `MeetingNote`
+- `MeetingObservation`
 
-Responsabilidade:
-- entidade raiz do domínio.
+### Arquivos
+- `ProjectFile`
 
-### Transcript
+### Board Kanban
+- `Board`
+- `BoardColumn`
+- `Card`
+- `CardAssignee`
+- `CardChecklist`
+- `CardChecklistItem`
+- `CardComment`
+- `CardAttachment`
+- `CardLink`
+- `CardLabel`
+- `CardLabelRelation`
 
-Campos principais:
-- `id` (UUID, PK)
-- `meetingId` (único, FK)
-- `fullText` (LongText)
-- `language` (opcional)
-- `rawJson` (Json, opcional)
-- `createdAt`
+## 3) Enums
 
-Responsabilidade:
-- armazenar resultado completo de speech-to-text.
+### `OrganizationRole`
+- `OWNER`, `ADMIN`, `MEMBER`, `VIEWER`
 
-### Note
+### `ProjectRole`
+- `OWNER`, `ADMIN`, `MEMBER`, `VIEWER`
 
-Campos principais:
-- `id` (UUID, PK)
-- `meetingId` (único, FK)
-- `summary` (LongText)
-- `topicsJson` (Json)
-- `decisionsJson` (Json)
-- `actionItemsJson` (Json)
-- `pendingItemsJson` (Json)
-- `commentsJson` (Json)
-- `createdAt`
+### `MeetingStatus`
+- `PENDING`
+- `UPLOADED`
+- `TRANSCRIBING`
+- `TRANSCRIBED`
+- `PROCESSING_AI`
+- `COMPLETED`
+- `FAILED`
 
-Responsabilidade:
-- armazenar saída analítica gerada por IA.
+### `ObservationType`
+- `NOTE`, `TASK`, `QUESTION`, `IMPORTANT`, `DECISION`
 
-### MeetingTag
+### `CardSourceType`
+- `MANUAL`, `AI`
 
-Campos principais:
-- `id` (UUID, PK)
-- `meetingId` (FK)
-- `tag`
+### `CardPriority`
+- `LOW`, `MEDIUM`, `HIGH`, `URGENT`
 
-Regras:
-- `@@unique([meetingId, tag])` para evitar duplicidade por reunião.
+## 4) Relacionamentos-Chave
 
-Responsabilidade:
-- classificação e busca por contexto de reunião.
-
-## Relacionamentos
-
+- `Organization 1:N Project`
+- `Organization 1:N OrganizationMember`
+- `User 1:N OrganizationMember`
+- `Project 1:N ProjectMember`
+- `Project 1:N Meeting`
+- `Project 1:N ProjectFile`
+- `Project 1:1 Board`
+- `Board 1:N BoardColumn`
+- `BoardColumn 1:N Card`
 - `Meeting 1:1 Transcript`
-  - uma reunião pode ter no máximo uma transcrição.
-- `Meeting 1:1 Note`
-  - uma reunião pode ter no máximo uma nota consolidada.
-- `Meeting 1:N MeetingTag`
-  - uma reunião pode conter várias tags.
+- `Meeting 1:1 MeetingNote`
+- `Meeting 1:N MeetingObservation`
+- `Meeting 1:N Card` (cards de origem da reunião)
+- `Card 1:N CardAssignee`
+- `Card 1:N CardChecklist`
+- `CardChecklist 1:N CardChecklistItem`
+- `Card 1:N CardComment`
+- `Card 1:N CardAttachment`
+- `Card 1:N CardLink`
+- `Card N:N CardLabel` via `CardLabelRelation`
 
-Regras de deleção:
-- `onDelete: Cascade` em `Transcript`, `Note` e `MeetingTag` quando `Meeting` é removida.
+## 5) Regras de Integridade
 
-## Índices e Restrições
+Unicidade importante:
+- `Organization.slug` único
+- `User.email` único
+- `OrganizationMember (organizationId, userId)` único
+- `ProjectMember (projectId, userId)` único
+- `Board.projectId` único
+- `Transcript.meetingId` único
+- `MeetingNote.meetingId` único
+- `CardAssignee (cardId, userId)` único
+- `CardLabel (projectId, name)` único
+- `CardLabelRelation (cardId, labelId)` único
 
-Índices existentes:
-- `Meeting.status`
-- `Meeting.createdAt`
-- `Transcript.createdAt`
-- `Note.createdAt`
-- `MeetingTag.meetingId`
-- `MeetingTag.tag`
+Regras funcionais modeladas:
+- cada projeto possui um board padrão;
+- cada reunião pertence a um projeto;
+- cada card pode ter múltiplos responsáveis;
+- cards suportam checklist, comentários, anexos, links e etiquetas.
 
-Restrições de unicidade:
-- `Transcript.meetingId` (1:1)
-- `Note.meetingId` (1:1)
-- `MeetingTag(meetingId, tag)`
+## 6) Campos JSON Estratégicos
 
-## Observações de Escalabilidade
+`MeetingNote` utiliza JSON para estrutura analítica flexível:
+- `topicsJson`
+- `decisionsJson`
+- `actionItemsJson`
+- `pendingItemsJson`
+- `commentsJson`
+- `reportJson`
 
-1. Processamento assíncrono:
-   mover transcrição/análise para fila (ex.: BullMQ/Redis) para maior resiliência.
-2. Histórico/versionamento:
-   considerar tabela de versões de nota/transcrição para auditoria temporal.
-3. Busca avançada:
-   para full-text e analytics, avaliar réplica analítica ou mecanismo dedicado.
-4. Multi-tenant:
-   adicionar entidade de organização e chave de isolamento por tenant.
+Vantagem: evolução do formato de IA sem migração frequente de colunas.
+
+## 7) Isolamento Multi-tenant
+
+A modelagem permite isolamento por organização através de:
+- `Project.organizationId`
+- joins de acesso por organização/projeto em todos os módulos sensíveis.
+
+Prática recomendada de consulta:
+- sempre filtrar por `organizationId` no nível raiz do domínio (`Project`, `Meeting`, `Card`, `ProjectFile`).
+
+## 8) Decisões para Produção Inicial
+
+- uso de UUIDs como PK para segurança e integração distribuída;
+- `createdAt/updatedAt` em entidades operacionais;
+- `onDelete` com cascata onde reduz lixo relacional;
+- índices em FKs e campos de consulta frequente.
+
+## 9) Próximas Evoluções de Schema
+
+- auditoria por ação (`who/when/what`);
+- histórico de versões de análise (`MeetingNoteVersion`);
+- convites (`OrganizationInvite` / `ProjectInvite`);
+- storage externo (S3/R2) com metadados de bucket/key;
+- tabelas para fila e rastreio de jobs de processamento.

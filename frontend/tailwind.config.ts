@@ -25,11 +25,26 @@ const config: Config = {
         },
         surface: {
           DEFAULT: '#F8F7F4'
+        },
+        app: {
+          DEFAULT: '#F7F9FC',
+          card: '#FFFFFF',
+          active: '#EAF4FF',
+          muted: '#5B6B7A',
+          border: '#E5E7EB',
+          softBorder: '#C7DAF2'
+        },
+        brand: {
+          DEFAULT: '#005EB8',
+          secondary: '#1565C0'
+        },
+        cta: {
+          DEFAULT: '#F9B51B'
         }
       },
       borderRadius: {
-        lg: '0.875rem',
-        xl: '1.125rem',
+        lg: '0.625rem',
+        xl: '0.875rem',
         full: '9999px'
       },
       fontFamily: {
@@ -37,8 +52,8 @@ const config: Config = {
         body: ['var(--font-manrope)', 'sans-serif']
       },
       boxShadow: {
-        soft: '0 12px 26px -20px rgba(6, 33, 63, 0.38)',
-        panel: '0 18px 46px -34px rgba(5, 30, 58, 0.5)'
+        soft: '0 10px 20px -18px rgba(6, 33, 63, 0.3)',
+        panel: '0 16px 32px -28px rgba(5, 30, 58, 0.34)'
       },
       backgroundImage: {
         'hero-grid':
