@@ -50,7 +50,11 @@ export class ProjectsController {
       throw new AppError(401, 'Não autenticado.');
     }
 
-    const projects = await projectsService.listProjects(req.auth.organizationId);
+    const projects = await projectsService.listProjects({
+      organizationId: req.auth.organizationId,
+      userId: req.auth.userId,
+      organizationRole: req.auth.role
+    });
 
     res.json({ projects });
   }
@@ -88,7 +92,12 @@ export class ProjectsController {
       throw new AppError(400, 'ID de projeto inválido.', params.error.flatten());
     }
 
-    const project = await projectsService.getProjectById(req.auth.organizationId, params.data.id);
+    const project = await projectsService.getProjectById({
+      organizationId: req.auth.organizationId,
+      projectId: params.data.id,
+      userId: req.auth.userId,
+      organizationRole: req.auth.role
+    });
 
     res.json(project);
   }
@@ -113,6 +122,8 @@ export class ProjectsController {
     const project = await projectsService.updateProject({
       organizationId: req.auth.organizationId,
       projectId: params.data.id,
+      userId: req.auth.userId,
+      organizationRole: req.auth.role,
       name: payload.data.name,
       description: payload.data.description,
       color: payload.data.color
@@ -132,7 +143,12 @@ export class ProjectsController {
       throw new AppError(400, 'ID de projeto inválido.', params.error.flatten());
     }
 
-    await projectsService.deleteProject(req.auth.organizationId, params.data.id);
+    await projectsService.deleteProject({
+      organizationId: req.auth.organizationId,
+      projectId: params.data.id,
+      userId: req.auth.userId,
+      organizationRole: req.auth.role
+    });
 
     res.status(204).send();
   }
@@ -150,7 +166,9 @@ export class ProjectsController {
 
     const members = await projectsService.listProjectMembers({
       organizationId: req.auth.organizationId,
-      projectId: params.data.id
+      projectId: params.data.id,
+      userId: req.auth.userId,
+      organizationRole: req.auth.role
     });
 
     res.json({ members });

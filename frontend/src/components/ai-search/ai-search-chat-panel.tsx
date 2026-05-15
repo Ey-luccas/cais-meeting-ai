@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 
 type AiSearchChatPanelProps = {
   title: string;
-  description: string;
+  description?: string | null;
   actions?: ReactNode;
   scopeControls?: ReactNode;
   errorMessage?: string | null;
@@ -28,7 +28,7 @@ export const AiSearchChatPanel = ({
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h2 className="text-lg font-semibold text-[#141a24]">{title}</h2>
-            <p className="mt-1 text-sm text-[#667085]">{description}</p>
+            {description ? <p className="mt-1 text-sm text-[#667085]">{description}</p> : null}
           </div>
           {actions}
         </div>

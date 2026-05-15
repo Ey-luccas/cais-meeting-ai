@@ -7,6 +7,7 @@ import { deepseekMeetingAnalysisService } from '../../services/ai/deepseek-meeti
 import { transcriptionRouterService } from '../../services/transcription/transcription-router.service';
 import { AppError } from '../../shared/app-error';
 import { logger } from '../../shared/logger';
+import { resolveProjectAccess } from '../../shared/project-access';
 import { resolveStoredFilePath, toPublicFileUrl } from '../../shared/storage';
 import { toRelativeStoragePath } from '../../shared/upload';
 import { aiSearchIndexService } from '../ai-search/ai-search-index.service';
@@ -109,40 +110,15 @@ export class MeetingsService {
     organizationRole: OrganizationRole;
     requiredAccess: 'read' | 'write';
   }): Promise<void> {
-    const project = await prisma.project.findFirst({
-      where: {
-        id: input.projectId,
-        organizationId: input.organizationId
-      },
-      select: {
-        id: true,
-        members: {
-          where: {
-            userId: input.userId
-          },
-          select: {
-            role: true
-          },
-          take: 1
-        }
-      }
+    const access = await resolveProjectAccess({
+      organizationId: input.organizationId,
+      projectId: input.projectId,
+      userId: input.userId,
+      organizationRole: input.organizationRole,
+      requiredAccess: 'read'
     });
 
-    if (!project) {
-      throw new AppError(404, 'Projeto não encontrado.');
-    }
-
-    if (input.organizationRole === 'OWNER' || input.organizationRole === 'ADMIN') {
-      return;
-    }
-
-    const projectRole = project.members[0]?.role;
-
-    if (!projectRole) {
-      throw new AppError(403, 'Você não tem acesso a este projeto.');
-    }
-
-    if (input.requiredAccess === 'write' && projectRole === 'VIEWER') {
+    if (input.requiredAccess === 'write' && !access.canWrite) {
       throw new AppError(403, 'Perfil VIEWER não pode modificar reuniões.');
     }
   }

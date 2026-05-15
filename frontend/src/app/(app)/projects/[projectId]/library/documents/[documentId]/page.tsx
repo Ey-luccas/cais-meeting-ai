@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import type { Route } from 'next';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { Archive, ArrowLeft, Download, Eye, EyeOff, Save, Trash2 } from 'lucide-react';
 
 import { useConfigureAppShell } from '@/components/layout/app-shell-config';
@@ -13,6 +13,7 @@ import { ErrorState } from '@/components/ui/error-state';
 import { LoadingSkeleton } from '@/components/ui/loading-skeleton';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { Textarea } from '@/components/ui/textarea';
+import { useTemporaryHighlight } from '@/hooks/useTemporaryHighlight';
 import { ApiError, api } from '@/lib/api';
 import { useAppSession } from '@/lib/app-session';
 import { formatDateTime } from '@/lib/format';
@@ -84,8 +85,11 @@ const buildDownload = (blob: Blob, fileName: string) => {
 
 export default function LibraryDocumentDetailPage() {
   const params = useParams<{ projectId: string; documentId: string }>();
+  const searchParams = useSearchParams();
   const projectId = params?.projectId;
   const documentId = params?.documentId;
+  const highlightedDocumentId = searchParams.get('highlight');
+  const { activeHighlightId } = useTemporaryHighlight({ highlightId: highlightedDocumentId });
   const router = useRouter();
   const session = useAppSession();
 
@@ -387,7 +391,12 @@ export default function LibraryDocumentDetailPage() {
         }
       />
 
-      <div className="rounded-xl border border-app bg-white p-4">
+      <div
+        data-highlight-id={documentId}
+        className={`rounded-xl border border-app bg-white p-4 ${
+          activeHighlightId === documentId ? 'temporary-highlight border-brand ring-2 ring-brand/20' : ''
+        }`}
+      >
         <div className="flex flex-wrap items-center gap-2">
           <StatusBadge label={STATUS_LABEL[documentItem.status]} tone={documentItem.status === 'PUBLISHED' ? 'success' : documentItem.status === 'ARCHIVED' ? 'warning' : 'neutral'} />
           <StatusBadge label={ORIGIN_LABEL[documentItem.origin]} tone="neutral" />
@@ -409,7 +418,7 @@ export default function LibraryDocumentDetailPage() {
               onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))}
               disabled={!canWrite}
               minLength={2}
-              className="h-10 w-full rounded-[10px] border border-app px-3 text-sm disabled:bg-[#f8fafc]"
+              className="h-10 w-full rounded-xl border border-app px-3 text-sm disabled:bg-[#f8fafc]"
             />
           </div>
 
@@ -424,7 +433,7 @@ export default function LibraryDocumentDetailPage() {
                 }))
               }
               disabled={!canWrite}
-              className="h-10 w-full rounded-[10px] border border-app px-3 text-sm disabled:bg-[#f8fafc]"
+              className="h-10 w-full rounded-xl border border-app px-3 text-sm disabled:bg-[#f8fafc]"
             >
               <option value="DRAFT">Rascunho</option>
               <option value="PUBLISHED">Publicado</option>
@@ -442,7 +451,7 @@ export default function LibraryDocumentDetailPage() {
                 }))
               }
               disabled={!canWrite}
-              className="h-10 w-full rounded-[10px] border border-app px-3 text-sm disabled:bg-[#f8fafc]"
+              className="h-10 w-full rounded-xl border border-app px-3 text-sm disabled:bg-[#f8fafc]"
             >
               {Object.entries(DOCUMENT_TYPE_LABEL).map(([key, label]) => (
                 <option key={key} value={key}>
@@ -458,7 +467,7 @@ export default function LibraryDocumentDetailPage() {
               value={form.folderId}
               onChange={(event) => setForm((current) => ({ ...current, folderId: event.target.value }))}
               disabled={!canWrite}
-              className="h-10 w-full rounded-[10px] border border-app px-3 text-sm disabled:bg-[#f8fafc]"
+              className="h-10 w-full rounded-xl border border-app px-3 text-sm disabled:bg-[#f8fafc]"
             >
               <option value="">Sem pasta</option>
               {folders.map((folder) => (

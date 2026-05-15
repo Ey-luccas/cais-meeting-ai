@@ -5,6 +5,7 @@ import type { OrganizationRole } from '@prisma/client';
 import { prisma } from '../../config/prisma';
 import { AppError } from '../../shared/app-error';
 import { logger } from '../../shared/logger';
+import { resolveProjectAccess } from '../../shared/project-access';
 import { resolveStoredFilePath, toPublicFileUrl } from '../../shared/storage';
 import { aiSearchIndexService } from '../ai-search/ai-search-index.service';
 import { notificationEventService } from '../notifications/notification-event.service';
@@ -190,50 +191,21 @@ export class FilesService {
     id: string;
     name: string;
   }> {
-    const project = await prisma.project.findFirst({
-      where: {
-        id: input.projectId,
-        organizationId: input.organizationId
-      },
-      select: {
-        id: true,
-        name: true,
-        members: {
-          where: {
-            userId: input.userId
-          },
-          select: {
-            role: true
-          },
-          take: 1
-        }
-      }
+    const context = await resolveProjectAccess({
+      organizationId: input.organizationId,
+      projectId: input.projectId,
+      userId: input.userId,
+      organizationRole: input.organizationRole,
+      requiredAccess: 'read'
     });
 
-    if (!project) {
-      throw new AppError(404, 'Projeto não encontrado.');
-    }
-
-    if (input.organizationRole === 'OWNER' || input.organizationRole === 'ADMIN') {
-      return {
-        id: project.id,
-        name: project.name
-      };
-    }
-
-    const projectRole = project.members[0]?.role;
-
-    if (!projectRole) {
-      throw new AppError(403, 'Você não tem acesso a este projeto.');
-    }
-
-    if (input.requiredAccess === 'write' && projectRole === 'VIEWER') {
+    if (input.requiredAccess === 'write' && !context.canWrite) {
       throw new AppError(403, 'Perfil VIEWER não pode alterar arquivos do projeto.');
     }
 
     return {
-      id: project.id,
-      name: project.name
+      id: context.project.id,
+      name: context.project.name
     };
   }
 

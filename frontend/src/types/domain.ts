@@ -61,6 +61,36 @@ export type SessionResponse = {
   }>;
 };
 
+export type InvitationProjectSummary = {
+  id: string;
+  name: string;
+  role: MemberRole;
+};
+
+export type CollaboratorInvitationSummary = {
+  id: string;
+  email: string;
+  role: MemberRole;
+  expiresAt: string;
+  acceptedAt: string | null;
+  createdAt: string;
+  invitedBy: {
+    id: string;
+    name: string;
+    email: string;
+  };
+  projects: InvitationProjectSummary[];
+};
+
+export type InvitationValidationResponse = {
+  isValid: boolean;
+  isExpired: boolean;
+  isAccepted: boolean;
+  email: string | null;
+  role: MemberRole | null;
+  projects: InvitationProjectSummary[];
+};
+
 export type ProjectSummary = {
   id: string;
   name: string;
@@ -625,13 +655,38 @@ export type OrganizationDashboardResponse = {
     decision: string;
     createdAt: string;
   }>;
-  recentPendingItems: Array<{
-    meetingId: string;
-    meetingTitle: string;
+  recentMeetings: Array<{
+    id: string;
+    title: string;
+    status: MeetingStatus;
+    createdAt: string;
+    updatedAt: string;
+    hasTranscript: boolean;
+    hasAnalysis: boolean;
+    decisionsCount: number;
+    pendingItemsCount: number;
     project: {
       id: string;
       name: string;
     };
+  }>;
+  recentPendingItems: Array<{
+    meetingId: string | null;
+    meetingTitle: string | null;
+    project: {
+      id: string;
+      name: string;
+    };
+    cardId: string;
+    stage: string;
+    priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT' | null;
+    dueDate: string | null;
+    assignees: Array<{
+      id: string;
+      name: string;
+      email: string;
+      avatarUrl: string | null;
+    }>;
     item: string;
     createdAt: string;
   }>;
@@ -680,6 +735,9 @@ export type AiSearchMessageSource = {
   href: string;
   excerpt: string | null;
   createdAt: string;
+  projectId: string | null;
+  projectName: string | null;
+  highlightTargetId: string | null;
 };
 
 export type AiSearchMessage = {
@@ -724,5 +782,26 @@ export type AiSearchThreadDetail = {
 export type AiSearchAskResponse = {
   threadId: string;
   reused: boolean;
+  scope: AiSearchScope;
+  projectId: string | null;
+  answer: string;
+  sources: AiSearchMessageSource[];
+  insufficientData: boolean;
+  calledDeepSeek: boolean;
+  rawResults: Array<{
+    id: string;
+    sourceType: AiSearchSourceType;
+    sourceId: string;
+    projectId: string | null;
+    projectName: string | null;
+    title: string;
+    snippet: string;
+    matchedText: string;
+    createdAt: string;
+    updatedAt: string;
+    url: string;
+    score: number;
+    highlightTargetId: string | null;
+  }>;
   message: AiSearchMessage;
 };

@@ -3,7 +3,7 @@ import { cva, type VariantProps } from 'class-variance-authority';
 
 import { cn } from '@/lib/utils';
 
-const badgeVariants = cva('inline-flex items-center rounded-[999px] border px-2.5 py-1 text-xs font-semibold', {
+const badgeVariants = cva('inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold', {
   variants: {
     variant: {
       default: 'border-app bg-white text-brand',

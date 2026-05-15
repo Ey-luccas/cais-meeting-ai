@@ -55,7 +55,7 @@ export default function HomePage() {
               alt="Logo Cais Teams"
               width={36}
               height={36}
-              className="h-9 w-9 rounded-[10px]"
+              className="h-9 w-9 rounded-xl"
               priority
             />
             <span className="text-sm font-bold text-brand">Cais Teams</span>
@@ -76,13 +76,13 @@ export default function HomePage() {
           <div className="flex items-center gap-2">
             <Link
               href="/login"
-              className="inline-flex h-10 items-center rounded-[10px] px-4 text-sm font-semibold text-[#334155] hover:bg-white"
+              className="inline-flex h-10 items-center rounded-xl px-4 text-sm font-semibold text-[#334155] hover:bg-white"
             >
               Entrar
             </Link>
             <Link
               href="/register"
-              className="inline-flex h-10 items-center rounded-[10px] bg-[#004d99] px-4 text-sm font-semibold text-white hover:bg-[#0a4c78]"
+              className="inline-flex h-10 items-center rounded-xl bg-[#004d99] px-4 text-sm font-semibold text-white hover:bg-[#0a4c78]"
             >
               Começar agora
             </Link>
@@ -94,7 +94,7 @@ export default function HomePage() {
         <section className="border-b border-[#e4e9f2] bg-[linear-gradient(180deg,#f7f9fd_0%,#faf9f6_100%)]">
           <div className="mx-auto grid w-full max-w-[1160px] gap-10 px-6 py-16 lg:grid-cols-[1.1fr_0.9fr] lg:px-8 lg:py-20">
             <div className="space-y-6">
-              <span className="inline-flex items-center rounded-[10px] border border-[#d5deec] bg-white px-3 py-1 text-xs font-semibold uppercase tracking-[0.08em] text-[#0a4c78]">
+              <span className="inline-flex items-center rounded-xl border border-[#d5deec] bg-white px-3 py-1 text-xs font-semibold uppercase tracking-[0.08em] text-[#0a4c78]">
                 Plataforma institucional com IA
               </span>
               <h1 className="max-w-[17ch] font-display text-4xl font-bold leading-tight text-[#0f172a] md:text-5xl">
@@ -107,14 +107,14 @@ export default function HomePage() {
               <div className="flex flex-wrap items-center gap-3">
                 <Link
                   href="/register"
-                  className="inline-flex h-11 items-center gap-2 rounded-[10px] bg-[#febb28] px-5 text-sm font-semibold text-[#3f2b00] hover:bg-[#f5b20e]"
+                  className="inline-flex h-11 items-center gap-2 rounded-xl bg-[#febb28] px-5 text-sm font-semibold text-[#3f2b00] hover:bg-[#f5b20e]"
                 >
                   Começar gratuitamente
                   <ArrowRight className="h-4 w-4" />
                 </Link>
                 <a
                   href="#como-funciona"
-                  className="inline-flex h-11 items-center rounded-[10px] border border-[#d5deec] bg-white px-5 text-sm font-semibold text-[#334155] hover:bg-[#f8faff]"
+                  className="inline-flex h-11 items-center rounded-xl border border-[#d5deec] bg-white px-5 text-sm font-semibold text-[#334155] hover:bg-[#f8faff]"
                 >
                   Ver como funciona
                 </a>
@@ -122,19 +122,19 @@ export default function HomePage() {
             </div>
 
             <div className="grid gap-3 sm:grid-cols-2">
-              <article className="rounded-[10px] border border-[#dfe5ef] bg-white p-5">
+              <article className="rounded-xl border border-[#dfe5ef] bg-white p-5">
                 <p className="text-xs font-semibold uppercase tracking-[0.06em] text-[#64748b]">Pesquisa IA</p>
                 <p className="mt-2 text-sm text-[#334155]">
                   Consulte decisões, tarefas e arquivos da organização ou de um projeto específico.
                 </p>
               </article>
-              <article className="rounded-[10px] border border-[#dfe5ef] bg-white p-5">
+              <article className="rounded-xl border border-[#dfe5ef] bg-white p-5">
                 <p className="text-xs font-semibold uppercase tracking-[0.06em] text-[#64748b]">Fluxo contínuo</p>
                 <p className="mt-2 text-sm text-[#334155]">
                   Da reunião ao board, mantenha responsáveis, prazos e andamento em um só lugar.
                 </p>
               </article>
-              <article className="rounded-[10px] border border-[#dfe5ef] bg-white p-5 sm:col-span-2">
+              <article className="rounded-xl border border-[#dfe5ef] bg-white p-5 sm:col-span-2">
                 <p className="text-xs font-semibold uppercase tracking-[0.06em] text-[#64748b]">Operação do time</p>
                 <p className="mt-2 text-sm text-[#334155]">
                   Painel, equipe, projetos e relatórios com linguagem única e foco em execução.
@@ -147,7 +147,7 @@ export default function HomePage() {
         <section id="produto" className="border-b border-[#e4e9f2] bg-[#faf9f6] py-14">
           <div className="mx-auto grid w-full max-w-[1160px] gap-4 px-6 md:grid-cols-3 lg:px-8">
             {resources.map((resource) => (
-              <article key={resource.title} className="rounded-[10px] border border-[#dfe5ef] bg-white p-5">
+              <article key={resource.title} className="rounded-xl border border-[#dfe5ef] bg-white p-5">
                 <resource.icon className="h-5 w-5 text-brand" />
                 <h2 className="mt-3 text-lg font-semibold text-[#0f172a]">{resource.title}</h2>
                 <p className="mt-2 text-sm text-[#475569]">{resource.description}</p>
@@ -164,7 +164,7 @@ export default function HomePage() {
             </p>
             <div className="mt-8 grid gap-4 md:grid-cols-2">
               {steps.map((step, index) => (
-                <article key={step.title} className="rounded-[10px] border border-[#dfe5ef] bg-white p-5">
+                <article key={step.title} className="rounded-xl border border-[#dfe5ef] bg-white p-5">
                   <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[#64748b]">Etapa {index + 1}</p>
                   <h3 className="mt-2 text-base font-semibold text-[#0f172a]">{step.title}</h3>
                   <p className="mt-2 text-sm text-[#475569]">{step.description}</p>
@@ -178,13 +178,13 @@ export default function HomePage() {
           <div className="mx-auto flex w-full max-w-[1160px] flex-col gap-6 px-6 lg:px-8">
             <h2 className="text-3xl font-bold text-[#0f172a]">Segurança e governança</h2>
             <div className="grid gap-3 md:grid-cols-3">
-              <div className="rounded-[10px] border border-[#dfe5ef] bg-white p-4 text-sm text-[#334155]">
+              <div className="rounded-xl border border-[#dfe5ef] bg-white p-4 text-sm text-[#334155]">
                 Controle de acesso por organização e papel.
               </div>
-              <div className="rounded-[10px] border border-[#dfe5ef] bg-white p-4 text-sm text-[#334155]">
+              <div className="rounded-xl border border-[#dfe5ef] bg-white p-4 text-sm text-[#334155]">
                 Escopo de dados por projeto para evitar vazamento de contexto.
               </div>
-              <div className="rounded-[10px] border border-[#dfe5ef] bg-white p-4 text-sm text-[#334155]">
+              <div className="rounded-xl border border-[#dfe5ef] bg-white p-4 text-sm text-[#334155]">
                 Histórico de ações e decisões para rastreabilidade operacional.
               </div>
             </div>
@@ -200,13 +200,13 @@ export default function HomePage() {
             <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
               <Link
                 href="/register"
-                className="inline-flex h-11 items-center rounded-[10px] bg-[#febb28] px-5 text-sm font-semibold text-[#3f2b00] hover:bg-[#f5b20e]"
+                className="inline-flex h-11 items-center rounded-xl bg-[#febb28] px-5 text-sm font-semibold text-[#3f2b00] hover:bg-[#f5b20e]"
               >
                 Começar gratuitamente
               </Link>
               <Link
                 href="/login"
-                className="inline-flex h-11 items-center rounded-[10px] border border-white/25 px-5 text-sm font-semibold text-white hover:bg-white/10"
+                className="inline-flex h-11 items-center rounded-xl border border-white/25 px-5 text-sm font-semibold text-white hover:bg-white/10"
               >
                 Entrar
               </Link>
@@ -224,7 +224,7 @@ export default function HomePage() {
                 alt="Logo Cais Teams"
                 width={32}
                 height={32}
-                className="h-8 w-8 rounded-[10px]"
+                className="h-8 w-8 rounded-xl"
               />
               <span className="font-semibold text-[#0f172a]">Cais Teams</span>
             </div>
@@ -253,7 +253,7 @@ export default function HomePage() {
       <Link
         href="/register"
         aria-label="Começar agora"
-        className="fixed bottom-5 right-5 inline-flex items-center gap-2 rounded-[10px] bg-[#004d99] px-4 py-2.5 text-sm font-semibold text-white shadow-lg hover:bg-[#0a4c78] md:hidden"
+        className="fixed bottom-5 right-5 inline-flex items-center gap-2 rounded-xl bg-[#004d99] px-4 py-2.5 text-sm font-semibold text-white shadow-lg hover:bg-[#0a4c78] md:hidden"
       >
         Começar
         <ArrowRight className="h-4 w-4" />

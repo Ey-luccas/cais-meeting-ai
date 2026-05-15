@@ -8,7 +8,7 @@ type EmptyStateProps = {
 };
 
 export const EmptyState = ({ title, description, action, icon: Icon }: EmptyStateProps) => (
-  <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-app bg-white px-5 py-8 text-center">
+  <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-app bg-white px-5 py-8 text-center">
     {Icon ? (
       <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-app-active text-brand">
         <Icon className="h-5 w-5" />

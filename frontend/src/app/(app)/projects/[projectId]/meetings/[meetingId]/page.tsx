@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import {
   CalendarDays,
   Check,
@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 
 import { useConfigureAppShell } from '@/components/layout/app-shell-config';
+import { useTemporaryHighlight } from '@/hooks/useTemporaryHighlight';
 import { ApiError, api } from '@/lib/api';
 import { useAppSession } from '@/lib/app-session';
 import { cn } from '@/lib/utils';
@@ -188,8 +189,11 @@ const transcriptSegments = (
 export default function MeetingDetailPage() {
   const router = useRouter();
   const params = useParams<{ projectId: string; meetingId: string }>();
+  const searchParams = useSearchParams();
   const projectId = params?.projectId;
   const meetingId = params?.meetingId;
+  const highlightedSectionId = searchParams.get('highlight');
+  const { activeHighlightId } = useTemporaryHighlight({ highlightId: highlightedSectionId });
   const session = useAppSession();
 
   const [activeTab, setActiveTab] = useState<'transcription' | 'summary' | 'topics'>('transcription');
@@ -577,7 +581,10 @@ export default function MeetingDetailPage() {
 
           {!isLoading && meeting ? (
             <div className="mx-auto grid min-w-0 w-full max-w-[1280px] grid-cols-12 gap-6">
-              <section className="col-span-12 mb-2">
+              <section
+                data-highlight-id="meeting-overview"
+                className={cn('col-span-12 mb-2', activeHighlightId === 'meeting-overview' ? 'temporary-highlight rounded-xl' : '')}
+              >
                 <div className="flex flex-wrap items-start justify-between gap-4">
                   <div>
                     <div className="mb-2 flex flex-wrap items-center gap-3">
@@ -634,7 +641,7 @@ export default function MeetingDetailPage() {
                         type="button"
                         onClick={seekAudio}
                         disabled={!meeting.audioUrl}
-                        className="relative h-8 w-full overflow-hidden rounded bg-[#ecedf6]"
+                        className="relative h-8 w-full overflow-hidden rounded-lg bg-[#ecedf6]"
                       >
                         <div className="absolute inset-0 flex items-center gap-[3px] px-3 opacity-45">
                           {Array.from({ length: 42 }).map((_, index) => (
@@ -707,7 +714,13 @@ export default function MeetingDetailPage() {
                     </button>
                   </div>
 
-                  <div className="rounded-xl border border-[#e1e2ea] bg-white p-6 shadow-[0_10px_40px_rgba(0,0,0,0.04)] md:p-8">
+                  <div
+                    data-highlight-id="meeting-transcription"
+                    className={cn(
+                      'rounded-xl border border-[#e1e2ea] bg-white p-6 shadow-[0_10px_40px_rgba(0,0,0,0.04)] md:p-8',
+                      activeHighlightId === 'meeting-transcription' ? 'temporary-highlight border-brand ring-2 ring-brand/20' : ''
+                    )}
+                  >
                     {activeTab === 'transcription' ? (
                       transcriptBlocks.length > 0 ? (
                         <div className="space-y-6">
@@ -729,7 +742,7 @@ export default function MeetingDetailPage() {
                                 </div>
                                 <p className="text-sm text-[#191c21]">{entry.content}</p>
                                 {entry.highlight ? (
-                                  <div className="mt-3 inline-flex items-center gap-2 rounded border border-[#a9c7ff] bg-[#B9DDFF]/50 px-3 py-1.5 text-xs font-bold text-[#00478d]">
+                                  <div className="mt-3 inline-flex items-center gap-2 rounded-lg border border-[#a9c7ff] bg-[#B9DDFF]/50 px-3 py-1.5 text-xs font-bold text-[#00478d]">
                                     <Sparkles className="h-3.5 w-3.5" />
                                     {entry.highlight}
                                   </div>
@@ -838,7 +851,13 @@ export default function MeetingDetailPage() {
                     </div>
                   </section>
 
-                  <section className="rounded-xl border border-[#a9c7ff] bg-white/90 p-6 shadow-[0_10px_40px_rgba(0,0,0,0.04)]">
+                  <section
+                    data-highlight-id="meeting-decisions"
+                    className={cn(
+                      'rounded-xl border border-[#a9c7ff] bg-white/90 p-6 shadow-[0_10px_40px_rgba(0,0,0,0.04)]',
+                      activeHighlightId === 'meeting-decisions' ? 'temporary-highlight border-brand ring-2 ring-brand/20' : ''
+                    )}
+                  >
                     <h3 className="mb-4 flex items-center gap-2 text-lg font-semibold text-[#005eb8]">
                       <ListChecks className="h-5 w-5" />
                       Decisões-chave
@@ -846,19 +865,36 @@ export default function MeetingDetailPage() {
 
                     {meeting.analysis?.decisions.length ? (
                       <ul className="space-y-3">
-                        {meeting.analysis.decisions.slice(0, 4).map((decision, index) => (
-                          <li key={`${decision}-${index}`} className="flex items-start gap-2 rounded border border-[#e1e2ea] bg-white p-3 text-sm text-[#191c21]">
-                            <span className="mt-0.5 text-[#F9B51B]">•</span>
-                            {decision}
-                          </li>
-                        ))}
+                        {meeting.analysis.decisions.map((decision, index) => {
+                          const decisionHighlightId = `meeting-decision-${index + 1}`;
+
+                          return (
+                            <li
+                              key={`${decision}-${index}`}
+                              data-highlight-id={decisionHighlightId}
+                              className={cn(
+                                'flex items-start gap-2 rounded-lg border border-[#e1e2ea] bg-white p-3 text-sm text-[#191c21]',
+                                activeHighlightId === decisionHighlightId ? 'temporary-highlight border-brand ring-2 ring-brand/20' : ''
+                              )}
+                            >
+                              <span className="mt-0.5 text-[#F9B51B]">•</span>
+                              {decision}
+                            </li>
+                          );
+                        })}
                       </ul>
                     ) : (
                       <p className="text-sm text-[#727783]">Sem decisões extraídas até o momento.</p>
                     )}
                   </section>
 
-                  <section className="rounded-xl border border-[#e1e2ea] bg-[#ecedf6] p-6 shadow-[0_10px_40px_rgba(0,0,0,0.04)]">
+                  <section
+                    data-highlight-id="meeting-tasks"
+                    className={cn(
+                      'rounded-xl border border-[#e1e2ea] bg-[#ecedf6] p-6 shadow-[0_10px_40px_rgba(0,0,0,0.04)]',
+                      activeHighlightId === 'meeting-tasks' ? 'temporary-highlight border-brand ring-2 ring-brand/20' : ''
+                    )}
+                  >
                     <div className="mb-4 flex items-center justify-between">
                       <h3 className="flex items-center gap-2 text-lg font-semibold text-[#191c21]">
                         <ClipboardList className="h-5 w-5 text-[#F9B51B]" />
@@ -871,24 +907,35 @@ export default function MeetingDetailPage() {
 
                     <div className="space-y-3">
                       {meeting.analysis?.tasks.length ? (
-                        meeting.analysis.tasks.slice(0, 3).map((task, index) => (
-                          <article key={`${task.title}-${index}`} className="rounded-lg border border-[#e1e2ea] bg-white p-4 shadow-sm transition-colors hover:border-[#005eb8]">
-                            <div className="mb-2 flex items-start justify-between gap-2">
-                              <span className={cn('rounded px-2 py-0.5 text-[10px] font-bold uppercase', priorityClassMap[task.priority])}>
-                                {taskPriorityLabel[task.priority]}
-                              </span>
-                              <Sparkles className="h-4 w-4 text-[#727783]" />
-                            </div>
-                            <h4 className="mb-2 text-sm font-bold text-[#191c21]">{task.title}</h4>
-                            {task.description ? <p className="mb-3 text-xs text-[#424752]">{task.description}</p> : null}
-                            <div className="flex items-center justify-between text-[11px] text-[#727783]">
-                              <span>
-                                {task.dueDate ? formatDateLabel(task.dueDate) : 'Sem prazo'}
-                              </span>
-                              <span>{task.assignees.length ? task.assignees.join(', ') : 'Sem responsável'}</span>
-                            </div>
-                          </article>
-                        ))
+                        meeting.analysis.tasks.map((task, index) => {
+                          const taskHighlightId = `meeting-task-${index + 1}`;
+
+                          return (
+                            <article
+                              key={`${task.title}-${index}`}
+                              data-highlight-id={taskHighlightId}
+                              className={cn(
+                                'rounded-lg border border-[#e1e2ea] bg-white p-4 shadow-sm transition-colors hover:border-[#005eb8]',
+                                activeHighlightId === taskHighlightId ? 'temporary-highlight border-brand ring-2 ring-brand/20' : ''
+                              )}
+                            >
+                              <div className="mb-2 flex items-start justify-between gap-2">
+                                <span className={cn('rounded-lg px-2 py-0.5 text-[10px] font-bold uppercase', priorityClassMap[task.priority])}>
+                                  {taskPriorityLabel[task.priority]}
+                                </span>
+                                <Sparkles className="h-4 w-4 text-[#727783]" />
+                              </div>
+                              <h4 className="mb-2 text-sm font-bold text-[#191c21]">{task.title}</h4>
+                              {task.description ? <p className="mb-3 text-xs text-[#424752]">{task.description}</p> : null}
+                              <div className="flex items-center justify-between text-[11px] text-[#727783]">
+                                <span>
+                                  {task.dueDate ? formatDateLabel(task.dueDate) : 'Sem prazo'}
+                                </span>
+                                <span>{task.assignees.length ? task.assignees.join(', ') : 'Sem responsável'}</span>
+                              </div>
+                            </article>
+                          );
+                        })
                       ) : (
                         <p className="text-sm text-[#727783]">Sem tarefas extraídas pela IA.</p>
                       )}
@@ -949,7 +996,7 @@ export default function MeetingDetailPage() {
                         .map((observation) => (
                           <div key={observation.id} className="rounded-lg border border-[#e1e2ea] bg-[#f9f9ff] p-3">
                             <div className="mb-1 flex flex-wrap items-center gap-2 text-xs text-[#727783]">
-                              <span className="rounded bg-white px-2 py-0.5 font-semibold text-[#424752]">{observationTypeLabel[observation.type]}</span>
+                              <span className="rounded-lg bg-white px-2 py-0.5 font-semibold text-[#424752]">{observationTypeLabel[observation.type]}</span>
                               <span>{formatTimestamp(observation.timestampSeconds)}</span>
                               <span>{observation.author.name}</span>
                             </div>

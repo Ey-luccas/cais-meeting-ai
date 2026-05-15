@@ -15,7 +15,7 @@ export const PermissionLockedState = ({
   ctaLabel,
   onCtaClick
 }: PermissionLockedStateProps) => (
-  <div className="flex flex-col items-center justify-center rounded-xl border border-app bg-white px-5 py-8 text-center">
+  <div className="flex flex-col items-center justify-center rounded-2xl border border-app bg-white px-5 py-8 text-center">
     <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-app-active text-brand">
       <Lock className="h-5 w-5" />
     </div>

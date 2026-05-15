@@ -28,7 +28,36 @@ const loginSchema = z.object({
   organizationSlug: z.string().trim().min(2).max(48).optional()
 });
 
+const invitationParamsSchema = z.object({
+  token: z.string().trim().min(16)
+});
+
+const acceptInvitationSchema = z.object({
+  name: z.string().trim().min(2).max(120),
+  password: z.string().min(8).max(72)
+});
+
+const forgotPasswordSchema = z.object({
+  email: z.string().trim().email()
+});
+
+const resetPasswordSchema = z.object({
+  token: z.string().trim().min(16),
+  password: z.string().min(8).max(72)
+});
+
 const updateProfileSchema = z.object({
+  name: z.preprocess(
+    (value) => {
+      if (typeof value !== 'string') {
+        return value;
+      }
+
+      const normalized = value.trim();
+      return normalized.length === 0 ? undefined : normalized;
+    },
+    z.string().min(2).max(120).optional()
+  ),
   phone: z.preprocess(
     (value) => {
       if (typeof value !== 'string') {
@@ -109,6 +138,71 @@ export class AuthController {
     res.status(204).send();
   }
 
+  async validateInvitation(req: Request, res: Response): Promise<void> {
+    const params = invitationParamsSchema.safeParse(req.params);
+
+    if (!params.success) {
+      throw new AppError(400, 'Token de convite inválido.', params.error.flatten());
+    }
+
+    const result = await authService.validateInvitationToken(params.data.token);
+    res.json(result);
+  }
+
+  async acceptInvitation(req: Request, res: Response): Promise<void> {
+    const params = invitationParamsSchema.safeParse(req.params);
+
+    if (!params.success) {
+      throw new AppError(400, 'Token de convite inválido.', params.error.flatten());
+    }
+
+    const body = acceptInvitationSchema.safeParse(req.body);
+
+    if (!body.success) {
+      throw new AppError(400, 'Payload inválido para aceite de convite.', body.error.flatten());
+    }
+
+    const session = await authService.acceptInvitation({
+      token: params.data.token,
+      name: body.data.name,
+      password: body.data.password
+    });
+
+    setAuthCookie(res, session.token);
+    res.json(session);
+  }
+
+  async forgotPassword(req: Request, res: Response): Promise<void> {
+    const body = forgotPasswordSchema.safeParse(req.body);
+
+    if (!body.success) {
+      throw new AppError(400, 'Payload inválido para recuperação de senha.', body.error.flatten());
+    }
+
+    await authService.forgotPassword(body.data.email);
+
+    res.json({
+      message: 'Se o e-mail existir, enviaremos instruções para redefinir a senha.'
+    });
+  }
+
+  async resetPassword(req: Request, res: Response): Promise<void> {
+    const body = resetPasswordSchema.safeParse(req.body);
+
+    if (!body.success) {
+      throw new AppError(400, 'Payload inválido para redefinição de senha.', body.error.flatten());
+    }
+
+    await authService.resetPassword({
+      token: body.data.token,
+      password: body.data.password
+    });
+
+    res.json({
+      message: 'Senha redefinida com sucesso.'
+    });
+  }
+
   async updateProfile(req: Request, res: Response): Promise<void> {
     if (!req.auth) {
       throw new AppError(401, 'Não autenticado.');
@@ -131,6 +225,7 @@ export class AuthController {
       userId: req.auth.userId,
       organizationId: req.auth.organizationId,
       memberId: req.auth.memberId,
+      name: parsed.data.name,
       phone: parsed.data.phone,
       avatarUrl,
       removeAvatar: parsed.data.removeAvatar

@@ -10,6 +10,10 @@ const profileUpload = createUploader('avatars', profileImageMimeTypes);
 
 authRouter.post('/auth/register', asyncHandler((req, res) => authController.register(req, res)));
 authRouter.post('/auth/login', asyncHandler((req, res) => authController.login(req, res)));
+authRouter.get('/auth/invitations/:token', asyncHandler((req, res) => authController.validateInvitation(req, res)));
+authRouter.post('/auth/invitations/:token/accept', asyncHandler((req, res) => authController.acceptInvitation(req, res)));
+authRouter.post('/auth/forgot-password', asyncHandler((req, res) => authController.forgotPassword(req, res)));
+authRouter.post('/auth/reset-password', asyncHandler((req, res) => authController.resetPassword(req, res)));
 authRouter.get(
   '/auth/me',
   asyncHandler(async (req, res, next) => requireAuth(req, res, next)),

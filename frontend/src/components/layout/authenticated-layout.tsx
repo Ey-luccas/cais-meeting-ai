@@ -2,21 +2,28 @@
 
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { useState } from 'react';
 
 import { AppShell } from '@/components/layout/app-shell';
 import { AppShellConfigProvider } from '@/components/layout/app-shell-config';
 import { AppSessionProvider } from '@/lib/app-session';
 import { useAuthGuard } from '@/lib/use-auth-guard';
+import type { SessionResponse } from '@/types/domain';
 
 export const AuthenticatedLayout = ({ children }: { children: React.ReactNode }) => {
   const router = useRouter();
   const { status, session, signOut } = useAuthGuard();
+  const [sessionState, setSessionState] = useState<SessionResponse | null>(null);
 
   useEffect(() => {
     if (status === 'unauthenticated') {
       router.replace('/login');
     }
   }, [router, status]);
+
+  useEffect(() => {
+    setSessionState(session);
+  }, [session]);
 
   if (status === 'loading') {
     return (
@@ -26,7 +33,7 @@ export const AuthenticatedLayout = ({ children }: { children: React.ReactNode })
     );
   }
 
-  if (!session) {
+  if (!sessionState) {
     return null;
   }
 
@@ -37,13 +44,14 @@ export const AuthenticatedLayout = ({ children }: { children: React.ReactNode })
   };
 
   return (
-    <AppSessionProvider session={session}>
+    <AppSessionProvider session={sessionState}>
       <AppShellConfigProvider>
         <AppShell
-          userName={session.user.fullName}
-          userEmail={session.user.email}
-          userAvatarUrl={session.user.avatarUrl}
-          userPhone={session.user.phone}
+          userName={sessionState.user.fullName}
+          userEmail={sessionState.user.email}
+          userAvatarUrl={sessionState.user.avatarUrl}
+          userPhone={sessionState.user.phone}
+          onSessionUpdate={setSessionState}
           onSignOut={handleSignOut}
         >
           {children}

@@ -138,7 +138,7 @@ export const AuthScreen = ({ mode }: AuthScreenProps) => {
                 alt="Logo Cais"
                 width={28}
                 height={28}
-                className="h-7 w-7 rounded-md"
+                className="h-7 w-7 rounded-lg"
                 priority
               />
               <span className="text-sm font-bold text-brand">Cais Teams</span>

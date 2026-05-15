@@ -11,7 +11,7 @@ export const LoadingSkeleton = ({ lines = 3, className }: LoadingSkeletonProps) 
       {Array.from({ length: lines }).map((_, index) => (
         <div
           key={index}
-          className="h-3 animate-pulse rounded bg-app"
+          className="h-3 animate-pulse rounded-lg bg-app"
           style={{ width: `${Math.max(45, 100 - index * 12)}%` }}
         />
       ))}

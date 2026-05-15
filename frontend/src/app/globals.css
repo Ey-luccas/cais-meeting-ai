@@ -15,9 +15,9 @@
 
 @layer base {
   :root {
-    --app-radius-card: 10px;
-    --app-radius-input: 10px;
-    --app-radius-modal: 14px;
+    --app-radius-card: 1rem;
+    --app-radius-input: 0.875rem;
+    --app-radius-modal: 1rem;
     --app-space-page: 24px;
     --app-space-section: 24px;
     --app-space-card: 20px;
@@ -65,6 +65,28 @@ body {
     linear-gradient(to right, rgba(21, 101, 192, 0.05) 1px, transparent 1px),
     linear-gradient(to bottom, rgba(21, 101, 192, 0.05) 1px, transparent 1px);
   background-size: 40px 40px;
+}
+
+@keyframes temporary-highlight {
+  0% {
+    box-shadow: 0 0 0 0 rgba(21, 101, 192, 0.2);
+    border-color: rgba(21, 101, 192, 0.65);
+    background-color: rgba(214, 227, 255, 0.35);
+  }
+
+  40% {
+    box-shadow: 0 0 0 8px rgba(21, 101, 192, 0.12);
+  }
+
+  100% {
+    box-shadow: 0 0 0 0 rgba(21, 101, 192, 0);
+    border-color: rgba(21, 101, 192, 0.25);
+    background-color: rgba(214, 227, 255, 0.08);
+  }
+}
+
+.temporary-highlight {
+  animation: temporary-highlight 4.2s ease-out;
 }
 
 ::selection {

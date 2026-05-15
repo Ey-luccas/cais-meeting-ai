@@ -17,6 +17,7 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [resetSuccess, setResetSuccess] = useState(false);
 
   useEffect(() => {
     const session = getStoredSession();
@@ -24,6 +25,9 @@ export default function LoginPage() {
     if (session?.token) {
       router.replace('/dashboard');
     }
+
+    const params = new URLSearchParams(window.location.search);
+    setResetSuccess(params.get('reset') === 'success');
   }, [router]);
 
   const canSubmit = useMemo(() => email.trim().length > 0 && password.length > 0, [email, password]);
@@ -67,14 +71,14 @@ export default function LoginPage() {
               alt="Logo Cais Teams"
               width={36}
               height={36}
-              className="h-9 w-9 rounded-[10px]"
+              className="h-9 w-9 rounded-xl"
               priority
             />
             <span className="text-sm font-bold text-brand">Cais Teams</span>
           </Link>
           <Link
             href="/register"
-            className="inline-flex h-10 items-center rounded-[10px] border border-[#d5deec] bg-white px-4 text-sm font-semibold text-[#334155] hover:bg-[#f8faff]"
+            className="inline-flex h-10 items-center rounded-xl border border-[#d5deec] bg-white px-4 text-sm font-semibold text-[#334155] hover:bg-[#f8faff]"
           >
             Criar conta
           </Link>
@@ -82,23 +86,23 @@ export default function LoginPage() {
       </header>
 
       <main className="mx-auto grid w-full max-w-[1100px] gap-6 px-6 py-10 lg:grid-cols-[1fr_1fr] lg:px-8 lg:py-14">
-        <section className="rounded-[10px] border border-[#dfe5ef] bg-white p-6">
+        <section className="rounded-xl border border-[#dfe5ef] bg-white p-6">
           <h1 className="text-3xl font-bold text-[#0f172a]">Entrar no Cais Teams</h1>
           <p className="mt-3 text-sm text-[#475569]">
             Acesse o ambiente da sua organização para acompanhar decisões, tarefas, reuniões e projetos.
           </p>
 
           <div className="mt-6 space-y-3">
-            <div className="rounded-[10px] border border-[#e4e9f2] bg-[#f8faff] px-4 py-3 text-sm text-[#334155]">
+            <div className="rounded-xl border border-[#e4e9f2] bg-[#f8faff] px-4 py-3 text-sm text-[#334155]">
               Organização, equipe, quadro e arquivos em um único fluxo.
             </div>
-            <div className="rounded-[10px] border border-[#e4e9f2] bg-[#f8faff] px-4 py-3 text-sm text-[#334155]">
+            <div className="rounded-xl border border-[#e4e9f2] bg-[#f8faff] px-4 py-3 text-sm text-[#334155]">
               Pesquisa IA Central com escopo por organização ou por projeto.
             </div>
           </div>
         </section>
 
-        <section className="rounded-[10px] border border-[#dfe5ef] bg-white p-6">
+        <section className="rounded-xl border border-[#dfe5ef] bg-white p-6">
           <div className="mb-6">
             <h2 className="text-xl font-semibold text-[#0f172a]">Acesso</h2>
             <p className="mt-1 text-sm text-[#64748b]">Use seu e-mail e senha para continuar.</p>
@@ -116,7 +120,7 @@ export default function LoginPage() {
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
                 placeholder="nome@empresa.com"
-                className="h-11 w-full rounded-[10px] border border-[#d9e1ed] bg-white px-3 text-sm text-[#111827] outline-none transition-all focus:border-[#1565C0]/45 focus:ring-2 focus:ring-[#1565C0]/20"
+                className="h-11 w-full rounded-xl border border-[#d9e1ed] bg-white px-3 text-sm text-[#111827] outline-none transition-all focus:border-[#1565C0]/45 focus:ring-2 focus:ring-[#1565C0]/20"
                 required
               />
             </div>
@@ -126,7 +130,9 @@ export default function LoginPage() {
                 <label className="text-xs font-semibold uppercase tracking-[0.06em] text-[#475569]" htmlFor="password">
                   Senha
                 </label>
-                <span className="text-xs text-[#64748b]">Recuperação de senha em breve.</span>
+                <Link href="/forgot-password" className="text-xs font-semibold text-brand hover:underline">
+                  Esqueci minha senha
+                </Link>
               </div>
 
               <div className="relative">
@@ -137,7 +143,7 @@ export default function LoginPage() {
                   value={password}
                   onChange={(event) => setPassword(event.target.value)}
                   placeholder="••••••••"
-                  className="h-11 w-full rounded-[10px] border border-[#d9e1ed] bg-white px-3 pr-11 text-sm text-[#111827] outline-none transition-all focus:border-[#1565C0]/45 focus:ring-2 focus:ring-[#1565C0]/20"
+                  className="h-11 w-full rounded-xl border border-[#d9e1ed] bg-white px-3 pr-11 text-sm text-[#111827] outline-none transition-all focus:border-[#1565C0]/45 focus:ring-2 focus:ring-[#1565C0]/20"
                   required
                 />
                 <button
@@ -154,7 +160,7 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={!canSubmit || loading}
-              className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-[10px] bg-[#febb28] text-sm font-semibold text-[#3f2b00] transition-colors hover:bg-[#f5b20e] disabled:opacity-60"
+              className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#febb28] text-sm font-semibold text-[#3f2b00] transition-colors hover:bg-[#f5b20e] disabled:opacity-60"
             >
               {loading ? 'Entrando...' : 'Entrar'}
               <ArrowRight className="h-4 w-4" />
@@ -162,8 +168,14 @@ export default function LoginPage() {
           </form>
 
           {errorMessage ? (
-            <p className="mt-4 rounded-[10px] border border-[#ffdad6] bg-[#fff1ef] px-4 py-3 text-sm text-[#93000a]">
+            <p className="mt-4 rounded-xl border border-[#ffdad6] bg-[#fff1ef] px-4 py-3 text-sm text-[#93000a]">
               {errorMessage}
+            </p>
+          ) : null}
+
+          {resetSuccess ? (
+            <p className="mt-4 rounded-xl border border-[#d6e3ff] bg-[#d6e3ff]/35 px-4 py-3 text-sm text-[#003a75]">
+              Senha redefinida com sucesso. Faça login com a nova senha.
             </p>
           ) : null}
 

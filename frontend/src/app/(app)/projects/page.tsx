@@ -148,7 +148,7 @@ export default function ProjectsPage() {
       />
 
             {isLoading ? (
-              <div className="rounded-[10px] border border-[#dfe5ef] bg-white px-4 py-3 text-sm text-[#475569]">
+              <div className="rounded-xl border border-[#dfe5ef] bg-white px-4 py-3 text-sm text-[#475569]">
                 Carregando projetos...
               </div>
             ) : null}
@@ -175,9 +175,9 @@ export default function ProjectsPage() {
                 <button
                   type="button"
                   onClick={() => setShowCreateModal(true)}
-                  className="group flex min-h-[260px] h-full flex-col items-center justify-center rounded-[10px] border border-dashed border-[#cdd7e7] bg-[#f8faff] p-6 text-center transition-colors hover:bg-[#f1f6fd]"
+                  className="group flex min-h-[260px] h-full flex-col items-center justify-center rounded-xl border border-dashed border-[#cdd7e7] bg-[#f8faff] p-6 text-center transition-colors hover:bg-[#f1f6fd]"
                 >
-                  <span className="mb-3 flex h-11 w-11 items-center justify-center rounded-[10px] border border-[#dbe3f0] bg-white transition-transform group-hover:scale-105">
+                  <span className="mb-3 flex h-11 w-11 items-center justify-center rounded-xl border border-[#dbe3f0] bg-white transition-transform group-hover:scale-105">
                     <Plus className="h-5 w-5 text-[#005eb8]" />
                   </span>
                   <h3 className="mb-1 text-base font-semibold text-[#111827]">Criar novo projeto</h3>
@@ -189,13 +189,13 @@ export default function ProjectsPage() {
             </div>
 
             {errorMessage ? (
-              <p className="rounded-[10px] border border-[#ffdad6] bg-[#ffefed] px-4 py-3 text-sm text-[#93000a]">
+              <p className="rounded-xl border border-[#ffdad6] bg-[#ffefed] px-4 py-3 text-sm text-[#93000a]">
                 {errorMessage}
               </p>
             ) : null}
 
             {successMessage ? (
-              <p className="rounded-[10px] border border-[#d6e3ff] bg-[#eef5ff] px-4 py-3 text-sm text-[#003a75]">
+              <p className="rounded-xl border border-[#d6e3ff] bg-[#eef5ff] px-4 py-3 text-sm text-[#003a75]">
                 {successMessage}
               </p>
             ) : null}
@@ -216,7 +216,7 @@ export default function ProjectsPage() {
               value={description}
               onChange={(event) => setDescription(event.target.value)}
               rows={4}
-              className="w-full rounded-[10px] border border-[#d3dceb] bg-white px-3.5 py-3 text-sm text-[#111827] outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/10"
+              className="w-full rounded-xl border border-[#d3dceb] bg-white px-3.5 py-3 text-sm text-[#111827] outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/10"
             />
           </FormField>
 
@@ -226,7 +226,7 @@ export default function ProjectsPage() {
                 type="color"
                 value={color}
                 onChange={(event) => setColor(event.target.value)}
-                className="h-11 w-14 rounded-[10px] border border-app bg-white p-1"
+                className="h-11 w-14 rounded-xl border border-app bg-white p-1"
               />
               <Input
                 value={color}

@@ -15,6 +15,7 @@ aiSearchRouter.post(
   '/ai-search/threads/:id/messages',
   asyncHandler((req, res) => aiSearchController.askInThread(req, res))
 );
+aiSearchRouter.patch('/ai-search/threads/:id', asyncHandler((req, res) => aiSearchController.renameThread(req, res)));
 aiSearchRouter.patch(
   '/ai-search/threads/:id/archive',
   asyncHandler((req, res) => aiSearchController.archiveThread(req, res))

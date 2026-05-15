@@ -29,6 +29,7 @@ import { Input } from '@/components/ui/input';
 import { LoadingSkeleton } from '@/components/ui/loading-skeleton';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { Textarea } from '@/components/ui/textarea';
+import { useTemporaryHighlight } from '@/hooks/useTemporaryHighlight';
 import { ApiError, api } from '@/lib/api';
 import { useAppSession } from '@/lib/app-session';
 import { formatBytes, formatDateTime } from '@/lib/format';
@@ -168,6 +169,7 @@ export default function ProjectLibraryPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const highlightedItemId = searchParams.get('item');
+  const { activeHighlightId } = useTemporaryHighlight({ highlightId: highlightedItemId });
   const session = useAppSession();
 
   const [project, setProject] = useState<ProjectDetail | null>(null);
@@ -678,6 +680,10 @@ export default function ProjectLibraryPage() {
 
   return (
     <div className="space-y-6">
+      <div className="inline-flex rounded-full border border-[#b9ddff] bg-[#eaf3ff] px-3 py-1 text-[11px] font-semibold text-[#005eb8]">
+        Em desenvolvimento · atualização prevista para 22 de maio
+      </div>
+
       <PageHeader
         title="Biblioteca"
         description="Arquivos, atas e documentos vivos do projeto em um só lugar."
@@ -767,7 +773,7 @@ export default function ProjectLibraryPage() {
               <select
                 value={originFilter}
                 onChange={(event) => setOriginFilter(event.target.value as 'ALL' | LibraryItemOrigin)}
-                className="h-10 rounded-[10px] border border-app px-3 text-sm"
+                className="h-10 rounded-xl border border-app px-3 text-sm"
               >
                 <option value="ALL">Origem: todas</option>
                 <option value="MANUAL">Manual</option>
@@ -779,7 +785,7 @@ export default function ProjectLibraryPage() {
               <select
                 value={statusFilter}
                 onChange={(event) => setStatusFilter(event.target.value as 'ALL' | LibraryItemStatus)}
-                className="h-10 rounded-[10px] border border-app px-3 text-sm"
+                className="h-10 rounded-xl border border-app px-3 text-sm"
               >
                 <option value="ALL">Status: todos</option>
                 <option value="DRAFT">Rascunho</option>
@@ -790,7 +796,7 @@ export default function ProjectLibraryPage() {
               <select
                 value={tagFilter}
                 onChange={(event) => setTagFilter(event.target.value)}
-                className="h-10 rounded-[10px] border border-app px-3 text-sm"
+                className="h-10 rounded-xl border border-app px-3 text-sm"
               >
                 <option value="all">Etiqueta: todas</option>
                 {tags.map((tag) => (
@@ -834,9 +840,10 @@ export default function ProjectLibraryPage() {
                 return (
                   <article
                     key={item.id}
+                    data-highlight-id={item.id}
                     className={cn(
                       'rounded-xl border border-app bg-white p-4',
-                      highlightedItemId === item.id && 'border-brand ring-2 ring-brand/10'
+                      activeHighlightId === item.id && 'temporary-highlight border-brand ring-2 ring-brand/20'
                     )}
                   >
                     <div className="flex flex-wrap items-start justify-between gap-3">
@@ -1023,7 +1030,7 @@ export default function ProjectLibraryPage() {
                     documentType: event.target.value as LibraryDocumentType
                   }))
                 }
-                className="h-10 w-full rounded-[10px] border border-app px-3 text-sm"
+                className="h-10 w-full rounded-xl border border-app px-3 text-sm"
               >
                 {Object.entries(DOCUMENT_TYPE_LABEL).map(([key, label]) => (
                   <option key={key} value={key}>
@@ -1038,7 +1045,7 @@ export default function ProjectLibraryPage() {
               <select
                 value={documentForm.folderId}
                 onChange={(event) => setDocumentForm((current) => ({ ...current, folderId: event.target.value }))}
-                className="h-10 w-full rounded-[10px] border border-app px-3 text-sm"
+                className="h-10 w-full rounded-xl border border-app px-3 text-sm"
               >
                 <option value="">Sem pasta</option>
                 {folders.map((folder) => (
@@ -1125,7 +1132,7 @@ export default function ProjectLibraryPage() {
               <select
                 value={uploadForm.folderId}
                 onChange={(event) => setUploadForm((current) => ({ ...current, folderId: event.target.value }))}
-                className="h-10 w-full rounded-[10px] border border-app px-3 text-sm"
+                className="h-10 w-full rounded-xl border border-app px-3 text-sm"
               >
                 <option value="">Sem pasta</option>
                 {folders.map((folder) => (
@@ -1198,7 +1205,7 @@ export default function ProjectLibraryPage() {
             <select
               value={folderForm.parentId}
               onChange={(event) => setFolderForm((current) => ({ ...current, parentId: event.target.value }))}
-              className="h-10 w-full rounded-[10px] border border-app px-3 text-sm"
+              className="h-10 w-full rounded-xl border border-app px-3 text-sm"
             >
               <option value="">Raiz</option>
               {folders.map((folder) => (
@@ -1247,12 +1254,12 @@ export default function ProjectLibraryPage() {
 
           <div>
             <label className="mb-1 block text-xs font-semibold text-[#334155]">Cor</label>
-            <div className="flex items-center gap-3 rounded-[10px] border border-app px-3 py-2">
+            <div className="flex items-center gap-3 rounded-xl border border-app px-3 py-2">
               <input
                 type="color"
                 value={tagForm.color}
                 onChange={(event) => setTagForm((current) => ({ ...current, color: event.target.value }))}
-                className="h-8 w-10 rounded border border-app"
+                className="h-8 w-10 rounded-lg border border-app"
               />
               <Input
                 value={tagForm.color}
@@ -1315,7 +1322,7 @@ export default function ProjectLibraryPage() {
               <select
                 value={editItemForm.folderId}
                 onChange={(event) => setEditItemForm((current) => ({ ...current, folderId: event.target.value }))}
-                className="h-10 w-full rounded-[10px] border border-app px-3 text-sm"
+                className="h-10 w-full rounded-xl border border-app px-3 text-sm"
               >
                 <option value="">Sem pasta</option>
                 {folders.map((folder) => (
@@ -1337,7 +1344,7 @@ export default function ProjectLibraryPage() {
                       documentType: event.target.value as LibraryDocumentType
                     }))
                   }
-                  className="h-10 w-full rounded-[10px] border border-app px-3 text-sm"
+                  className="h-10 w-full rounded-xl border border-app px-3 text-sm"
                 >
                   {Object.entries(DOCUMENT_TYPE_LABEL).map(([key, label]) => (
                     <option key={key} value={key}>

@@ -1,6 +1,5 @@
 import { AppError } from '../../shared/app-error';
-import type { ChunkTranscriptionSuccess } from './groq-transcription.service';
-import type { TranscriptSegment, TranscriptionResult } from './types';
+import type { ChunkTranscriptionSuccess, TranscriptSegment, TranscriptionResult } from './types';
 
 const formatMarkerTime = (seconds: number): string => {
   const totalSeconds = Math.max(0, Math.floor(seconds));

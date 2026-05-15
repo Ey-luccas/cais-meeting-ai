@@ -1,7 +1,7 @@
 import type { CardPriority, OrganizationRole, Prisma } from '@prisma/client';
 
 import { prisma } from '../../config/prisma';
-import { AppError } from '../../shared/app-error';
+import { resolveProjectAccess } from '../../shared/project-access';
 
 const DAY_IN_MS = 24 * 60 * 60 * 1000;
 const CLOSED_COLUMN_KEYWORDS = [
@@ -319,50 +319,19 @@ export class ReportsService {
     description: string | null;
     color: string | null;
   }> {
-    const project = await prisma.project.findFirst({
-      where: {
-        id: input.projectId,
-        organizationId: input.organizationId
-      },
-      select: {
-        id: true,
-        name: true,
-        description: true,
-        color: true,
-        members: {
-          where: {
-            userId: input.userId
-          },
-          select: {
-            id: true
-          },
-          take: 1
-        }
-      }
+    const access = await resolveProjectAccess({
+      organizationId: input.organizationId,
+      projectId: input.projectId,
+      userId: input.userId,
+      organizationRole: input.organizationRole,
+      requiredAccess: 'read'
     });
 
-    if (!project) {
-      throw new AppError(404, 'Projeto não encontrado.');
-    }
-
-    if (input.organizationRole === 'OWNER' || input.organizationRole === 'ADMIN') {
-      return {
-        id: project.id,
-        name: project.name,
-        description: project.description,
-        color: project.color
-      };
-    }
-
-    if (!project.members[0]) {
-      throw new AppError(403, 'Você não tem acesso a este projeto.');
-    }
-
     return {
-      id: project.id,
-      name: project.name,
-      description: project.description,
-      color: project.color
+      id: access.project.id,
+      name: access.project.name,
+      description: access.project.description,
+      color: access.project.color
     };
   }
 

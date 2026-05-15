@@ -21,7 +21,7 @@ export const AiSearchMessage = ({
     <div className={cn('flex w-full', assistant ? 'justify-start' : 'justify-end')}>
       <article
         className={cn(
-          'max-w-[900px] rounded-[12px] px-4 py-3',
+          'max-w-[900px] rounded-2xl px-4 py-3',
           assistant
             ? 'border border-[#e2e8f3] bg-white text-[#111827]'
             : 'bg-[#005eb8] text-white shadow-[0_8px_18px_rgba(0,94,184,0.22)]'

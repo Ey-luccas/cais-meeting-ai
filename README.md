@@ -40,7 +40,10 @@ Regras gerais:
 ### Organização e Colaboradores
 - gestão de dados da organização
 - listagem, adição, troca de papel e remoção de membros
-- base para fluxo de convite (evolução futura)
+- convite de colaborador por e-mail com token temporário
+- aceite de convite com definição de senha
+- vínculo de colaborador aos projetos permitidos no convite
+- recuperação e redefinição de senha por token temporário
 
 ### Projetos
 Cada organização pode ter vários projetos.
@@ -88,8 +91,8 @@ Board no estilo Trello com:
 
 ## IA no CAIS
 
-### Transcrição (Groq)
-- provider principal: **Groq**
+### Transcrição (ElevenLabs Speech to Text)
+- provider principal: **ElevenLabs (Scribe v2)**
 - pipeline robusto para áudios longos com **FFmpeg**
 - split em chunks para respeitar limites de upload
 - transcrição por chunk + merge em ordem
@@ -120,16 +123,33 @@ Enums principais:
 
 ## Fluxo Completo da Reunião
 
+Fluxo principal atual:
+
+`Áudio da reunião` -> `ElevenLabs Speech to Text` -> `Transcrição` -> `DeepSeek` -> `Resumo/Ata/Itens de ação/Insights`
+
 1. Usuário cria reunião no projeto.
 2. Áudio é enviado (`upload`) ou informado no momento da criação.
 3. Sistema define status e prepara processamento.
 4. Áudio é dividido em chunks (quando necessário).
-5. Cada chunk é transcrito via Groq.
+5. Cada chunk é transcrito via ElevenLabs Speech to Text.
 6. Transcrições são mescladas em texto final.
 7. DeepSeek analisa transcrição + observações manuais.
 8. Resultado estruturado é salvo em `MeetingNote`.
 9. `actionItems` podem gerar cards automáticos no board.
 10. Reunião finaliza com status `COMPLETED` (ou `FAILED` em erro).
+
+## Fluxo de Colaborador (Convite e Acesso)
+
+Fluxo atual:
+
+`Admin/Owner` -> `Convida por e-mail` -> `Escolhe papel` -> `Seleciona projetos` -> `E-mail com link seguro` -> `Colaborador aceita convite e define senha` -> `Acesso somente aos projetos vinculados`
+
+Regras aplicadas:
+- token de convite com expiração
+- token de reset de senha com expiração e uso único
+- hash de token salvo no banco (token puro não é persistido)
+- filtragem de projetos no backend por papel e vínculo em `ProjectMember`
+- bloqueio backend para acesso direto por URL a projetos sem permissão
 
 ## Criação Automática de Cards
 
@@ -145,6 +165,9 @@ A partir dos `actionItems` da análise:
 
 - `/login`
 - `/register`
+- `/accept-invite?token=...`
+- `/forgot-password`
+- `/reset-password?token=...`
 - `/dashboard`
 - `/team`
 - `/projects`
@@ -164,6 +187,10 @@ Base: `http://localhost:4000/api/v1` (padrão; depende de `PORT`)
 - `POST /auth/register`
 - `POST /auth/login`
 - `GET /auth/me`
+- `GET /auth/invitations/:token`
+- `POST /auth/invitations/:token/accept`
+- `POST /auth/forgot-password`
+- `POST /auth/reset-password`
 
 ### Organization
 - `GET /organization`
@@ -174,6 +201,8 @@ Base: `http://localhost:4000/api/v1` (padrão; depende de `PORT`)
 - `POST /organization/members`
 - `PATCH /organization/members/:id`
 - `DELETE /organization/members/:id`
+- `POST /collaborators/invite`
+- `GET /collaborators/invitations`
 
 ### Projects
 - `POST /projects`
@@ -252,15 +281,20 @@ npm run dev
 - `DATABASE_URL`
 - `JWT_SECRET`
 - `AUTH_COOKIE_NAME`
-- `GROQ_API_KEY`
+- `ELEVENLABS_API_KEY`
 - `DEEPSEEK_API_KEY`
 - `DEEPSEEK_BASE_URL`
 - `DEEPSEEK_MODEL`
-- `TRANSCRIPTION_ENGINE` (`GROQ` | `LOCAL_FALLBACK`)
+- `TRANSCRIPTION_ENGINE` (`ELEVENLABS` | `LOCAL_FALLBACK`)
+- `APP_URL`
+- `SMTP_HOST`
+- `SMTP_PORT`
+- `SMTP_USER`
+- `SMTP_PASS`
+- `SMTP_FROM`
 
 ## Roadmap Futuro
 
-- convite formal de colaboradores por e-mail
 - múltiplas organizações ativas por usuário com troca rápida de contexto
 - fallback local de transcrição em produção
 - processamento assíncrono com fila (jobs/workers)

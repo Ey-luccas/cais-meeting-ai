@@ -13,7 +13,7 @@ export const SearchInput = ({ value, onChange, placeholder = 'Buscar...' }: Sear
       value={value}
       onChange={(event) => onChange(event.target.value)}
       placeholder={placeholder}
-      className="h-10 w-full rounded-[10px] border border-app bg-white pl-10 pr-3 text-sm text-[#111827] outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/10"
+      className="h-10 w-full rounded-xl border border-app bg-white pl-10 pr-3 text-sm text-[#111827] outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/10"
     />
   </div>
 );

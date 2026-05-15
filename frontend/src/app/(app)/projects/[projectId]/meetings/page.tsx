@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams } from 'next/navigation';
+import { RefreshCw } from 'lucide-react';
 
 import { useConfigureAppShell } from '@/components/layout/app-shell-config';
 import { PageHeader } from '@/components/layout/page-header';
@@ -83,14 +84,41 @@ export default function ProjectMeetingsPage() {
     }
   }, [loadData, projectId]);
 
-  const totals = useMemo(() => {
-    return {
+  const totals = useMemo(
+    () => ({
       all: meetings.length,
       completed: meetings.filter((entry) => entry.status === 'COMPLETED').length,
       processing: meetings.filter((entry) => entry.status === 'TRANSCRIBING' || entry.status === 'PROCESSING_AI').length,
       failed: meetings.filter((entry) => entry.status === 'FAILED').length
-    };
-  }, [meetings]);
+    }),
+    [meetings]
+  );
+
+  const statusItems = useMemo(
+    () => [
+      {
+        label: 'Total',
+        count: totals.all,
+        tone: 'info' as const
+      },
+      {
+        label: 'Concluídas',
+        count: totals.completed,
+        tone: 'success' as const
+      },
+      {
+        label: 'Em processamento',
+        count: totals.processing,
+        tone: 'warning' as const
+      },
+      {
+        label: 'Falhas',
+        count: totals.failed,
+        tone: 'danger' as const
+      }
+    ],
+    [totals]
+  );
 
   return (
     <>
@@ -100,7 +128,13 @@ export default function ProjectMeetingsPage() {
           description="Centralize gravações, transcrição e análise inteligente por reunião."
           actions={
             <>
-              <Button variant="subtle" onClick={() => void loadData()} disabled={isLoading}>
+              <Button
+                variant="ghost"
+                onClick={() => void loadData()}
+                disabled={isLoading}
+                className="h-10 bg-transparent px-2 text-[#005eb8] hover:bg-transparent hover:text-[#004b93]"
+              >
+                <RefreshCw className={isLoading ? 'h-4 w-4 animate-spin' : 'h-4 w-4'} />
                 Atualizar
               </Button>
               <Button asChild>
@@ -110,80 +144,70 @@ export default function ProjectMeetingsPage() {
           }
         />
 
-        <Card className="surface-card">
-          <CardHeader>
-            <CardTitle>Resumo de reuniões</CardTitle>
-            <CardDescription>Panorama de status e andamento das reuniões do projeto.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid gap-3 sm:grid-cols-4">
-              <div className="surface-soft p-4">
-                <p className="text-xs uppercase tracking-[0.14em] text-[#567188]">Total</p>
-                <p className="font-display text-3xl font-bold text-[#0A4C78]">{totals.all}</p>
-              </div>
-              <div className="surface-soft p-4">
-                <p className="text-xs uppercase tracking-[0.14em] text-[#567188]">Concluídas</p>
-                <p className="font-display text-3xl font-bold text-[#0A4C78]">{totals.completed}</p>
-              </div>
-              <div className="surface-soft p-4">
-                <p className="text-xs uppercase tracking-[0.14em] text-[#567188]">Em processamento</p>
-                <p className="font-display text-3xl font-bold text-[#0A4C78]">{totals.processing}</p>
-              </div>
-              <div className="surface-soft p-4">
-                <p className="text-xs uppercase tracking-[0.14em] text-[#567188]">Falhas</p>
-                <p className="font-display text-3xl font-bold text-[#0A4C78]">{totals.failed}</p>
-              </div>
-            </div>
+        {isLoading ? <p className="text-sm text-[#567188]">Carregando reuniões...</p> : null}
 
-            {isLoading ? <p className="text-sm text-[#567188]">Carregando reuniões...</p> : null}
-
-            {!isLoading && meetings.length === 0 ? (
+        {!isLoading && meetings.length === 0 ? (
+          <Card className="surface-card">
+            <CardContent className="p-5">
               <div className="surface-soft px-4 py-3 text-sm text-[#567188]">
                 <p className="font-semibold text-[#35536B]">Nenhuma reunião registrada neste projeto.</p>
                 <p className="mt-1">Crie uma reunião para começar a gerar transcrições e notas com IA.</p>
               </div>
-            ) : null}
+            </CardContent>
+          </Card>
+        ) : null}
 
-            {!isLoading ? (
-              <div className="grid gap-3">
-                {meetings.map((meeting) => (
-                  <Link
-                    key={meeting.id}
-                    href={`/projects/${projectId}/meetings/${meeting.id}`}
-                    className="surface-card p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-[#1565C0]/35"
-                  >
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                      <div>
-                        <h3 className="text-lg font-semibold text-[#0A4C78]">{meeting.title}</h3>
-                        <p className="text-xs text-[#567188]">
-                          {new Date(meeting.createdAt).toLocaleString('pt-BR')}
-                        </p>
-                      </div>
-                      <Badge className={statusClassName[meeting.status]}>{statusLabel[meeting.status]}</Badge>
+        {!isLoading && meetings.length > 0 ? (
+          <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
+            <div className="space-y-3">
+              {meetings.map((meeting) => (
+                <Link
+                  key={meeting.id}
+                  href={`/projects/${projectId}/meetings/${meeting.id}`}
+                  className="surface-card p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-[#1565C0]/35"
+                >
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <h3 className="text-lg font-semibold text-[#0A4C78]">{meeting.title}</h3>
+                      <p className="text-xs text-[#567188]">{new Date(meeting.createdAt).toLocaleString('pt-BR')}</p>
                     </div>
+                    <Badge className={statusClassName[meeting.status]}>{statusLabel[meeting.status]}</Badge>
+                  </div>
 
-                    {meeting.description ? (
-                      <p className="mt-2 line-clamp-2 text-sm text-[#35536B]">{meeting.description}</p>
-                    ) : null}
+                  {meeting.description ? <p className="mt-2 line-clamp-2 text-sm text-[#35536B]">{meeting.description}</p> : null}
 
-                    <div className="mt-3 flex flex-wrap gap-3 text-xs text-[#567188]">
-                      <span>{meeting.durationSeconds ? `${meeting.durationSeconds}s` : 'Sem duração'}</span>
-                      <span>{meeting.hasTranscript ? 'Com transcrição' : 'Sem transcrição'}</span>
-                      <span>{meeting.hasAnalysis ? 'Com análise IA' : 'Sem análise IA'}</span>
-                      <span>{meeting.observationsCount} observações</span>
+                  <div className="mt-3 flex flex-wrap gap-3 text-xs text-[#567188]">
+                    <span>{meeting.durationSeconds ? `${meeting.durationSeconds}s` : 'Sem duração'}</span>
+                    <span>{meeting.hasTranscript ? 'Com transcrição' : 'Sem transcrição'}</span>
+                    <span>{meeting.hasAnalysis ? 'Com análise IA' : 'Sem análise IA'}</span>
+                    <span>{meeting.observationsCount} observações</span>
+                  </div>
+                </Link>
+              ))}
+            </div>
+
+            <Card className="surface-card self-start xl:sticky xl:top-24">
+              <CardHeader>
+                <CardTitle>Status</CardTitle>
+                <CardDescription>Resumo compacto do andamento das reuniões.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                {statusItems.map((item) => (
+                  <div key={item.label} className="flex items-center justify-between rounded-xl border border-[#e4e9f2] bg-white px-3 py-2.5">
+                    <div>
+                      <p className="text-sm font-medium text-[#111827]">{item.label}</p>
                     </div>
-                  </Link>
+                    <Badge variant={item.tone}>{item.count}</Badge>
+                  </div>
                 ))}
-              </div>
-            ) : null}
+              </CardContent>
+            </Card>
+          </div>
+        ) : null}
 
-            {errorMessage ? (
-              <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-                {errorMessage}
-              </p>
-            ) : null}
-          </CardContent>
-        </Card>
+        {errorMessage ? (
+          <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{errorMessage}</p>
+        ) : null}
       </div>
     </>
   );

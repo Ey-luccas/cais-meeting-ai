@@ -21,16 +21,16 @@ export const KanbanCard = ({ card, isSelected, onClick }: KanbanCardProps) => (
     type="button"
     onClick={onClick}
     className={cn(
-      'w-full rounded-lg border bg-white p-4 text-left transition-colors hover:border-app-softBorder',
+      'w-full rounded-xl border bg-white p-4 text-left transition-colors hover:border-app-softBorder',
       isSelected ? 'border-brand' : 'border-app'
     )}
   >
     <div className="mb-2 flex flex-wrap gap-1.5">
       {card.sourceType === 'AI' ? (
-        <span className="rounded bg-app-active px-2 py-0.5 text-[10px] font-bold text-brand">IA</span>
+        <span className="rounded-lg bg-app-active px-2 py-0.5 text-[10px] font-bold text-brand">IA</span>
       ) : null}
       {card.priority ? (
-        <span className="rounded bg-app px-2 py-0.5 text-[10px] font-bold text-app-muted">{priorityLabel[card.priority]}</span>
+        <span className="rounded-lg bg-app px-2 py-0.5 text-[10px] font-bold text-app-muted">{priorityLabel[card.priority]}</span>
       ) : null}
     </div>
     <h4 className="text-sm font-bold text-[#111827]">{card.title}</h4>

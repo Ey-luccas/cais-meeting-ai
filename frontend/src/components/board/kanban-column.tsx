@@ -17,7 +17,7 @@ export const KanbanColumn = ({ column, selectedCardId, onCardSelect }: KanbanCol
         {column.title}
         <span className="ml-2 font-semibold text-app-muted">{column.cards.length}</span>
       </h3>
-      <button type="button" className="rounded-md p-1 text-app-muted hover:bg-app-active" aria-label="Opções da coluna">
+      <button type="button" className="rounded-lg p-1 text-app-muted hover:bg-app-active" aria-label="Opções da coluna">
         <MoreHorizontal className="h-4 w-4" />
       </button>
     </header>

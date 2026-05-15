@@ -19,12 +19,18 @@ export type AiSearchRetrievedChunk = {
 };
 
 export type AiSearchContextSource = {
+  contextId: string;
   sourceType: AiSearchSourceType;
   sourceId: string;
+  projectId: string | null;
   title: string;
   href: string;
   excerpt: string;
+  matchedText: string;
   date: string | null;
+  createdAt: string | null;
+  updatedAt: string | null;
+  highlightTargetId: string | null;
   score: number;
 };
 
@@ -57,6 +63,7 @@ const SOURCE_LABEL: Record<AiSearchSourceType, string> = {
 type SearchInput = {
   organizationId: string;
   projectId?: string;
+  projectIds?: string[];
   query: string;
   maxCandidates?: number;
   maxSources?: number;
@@ -135,6 +142,27 @@ const recencyScore = (updatedAt: Date): number => {
   return 0;
 };
 
+const parseHref = (href: string): URL | null => {
+  try {
+    return new URL(href, 'http://localhost');
+  } catch {
+    return null;
+  }
+};
+
+const extractHighlightTargetId = (href: string): string | null => {
+  return parseHref(href)?.searchParams.get('highlight')?.trim() || null;
+};
+
+const toSourceGroupKey = (chunk: ChunkRow): string => {
+  if (chunk.sourceType === 'DECISION' || chunk.sourceType === 'TASK') {
+    // Keep decisions and tasks at item level to preserve evidence and source navigation.
+    return chunk.id;
+  }
+
+  return `${chunk.sourceType}:${chunk.sourceId}`;
+};
+
 export class AiSearchRetrievalService {
   private computeScore(chunk: ChunkRow, query: string, terms: string[]): number {
     const title = chunk.title.toLowerCase();
@@ -171,10 +199,17 @@ export class AiSearchRetrievalService {
   private async findWithFullText(input: {
     organizationId: string;
     projectId?: string;
+    projectIds?: string[];
     query: string;
     maxCandidates: number;
   }): Promise<ChunkRow[]> {
-    const projectFilter = input.projectId ? Prisma.sql`AND projectId = ${input.projectId}` : Prisma.empty;
+    const projectFilter = input.projectId
+      ? Prisma.sql`AND projectId = ${input.projectId}`
+      : Array.isArray(input.projectIds)
+        ? input.projectIds.length > 0
+          ? Prisma.sql`AND projectId IN (${Prisma.join(input.projectIds)})`
+          : Prisma.sql`AND 1 = 0`
+        : Prisma.empty;
 
     try {
       const rows = await prisma.$queryRaw<ChunkRow[]>(Prisma.sql`
@@ -209,9 +244,14 @@ export class AiSearchRetrievalService {
   private async findWithLike(input: {
     organizationId: string;
     projectId?: string;
+    projectIds?: string[];
     query: string;
     maxCandidates: number;
   }): Promise<ChunkRow[]> {
+    if (!input.projectId && Array.isArray(input.projectIds) && input.projectIds.length === 0) {
+      return [];
+    }
+
     const terms = tokenize(input.query);
 
     const orFilters: Prisma.AiSearchChunkWhereInput[] = [
@@ -239,6 +279,12 @@ export class AiSearchRetrievalService {
           ? {
               projectId: input.projectId
             }
+          : Array.isArray(input.projectIds)
+            ? {
+                projectId: {
+                  in: input.projectIds
+                }
+              }
           : {}),
         OR: orFilters
       },
@@ -271,12 +317,14 @@ export class AiSearchRetrievalService {
       this.findWithFullText({
         organizationId: input.organizationId,
         projectId: input.projectId,
+        projectIds: input.projectIds,
         query,
         maxCandidates
       }),
       this.findWithLike({
         organizationId: input.organizationId,
         projectId: input.projectId,
+        projectIds: input.projectIds,
         query,
         maxCandidates
       })
@@ -303,18 +351,25 @@ export class AiSearchRetrievalService {
     const groupedBySource = new Map<string, AiSearchContextSource>();
 
     for (const chunk of scored) {
-      const key = `${chunk.sourceType}:${chunk.sourceId}`;
+      const key = toSourceGroupKey(chunk);
 
       const excerpt = toExcerpt(chunk.summary?.trim() || chunk.content, query);
       const date = chunk.updatedAt.toISOString();
+      const highlightTargetId = extractHighlightTargetId(chunk.href);
 
       const candidate: AiSearchContextSource = {
+        contextId: chunk.id,
         sourceType: chunk.sourceType,
         sourceId: chunk.sourceId,
+        projectId: chunk.projectId,
         title: chunk.title,
         href: chunk.href,
         excerpt,
+        matchedText: excerpt,
         date,
+        createdAt: chunk.createdAt.toISOString(),
+        updatedAt: chunk.updatedAt.toISOString(),
+        highlightTargetId,
         score: chunk.score
       };
 
@@ -335,6 +390,7 @@ export class AiSearchRetrievalService {
 
         return [
           `[FONTE ${index + 1}]`,
+          `ID: ${source.contextId}`,
           `Tipo: ${SOURCE_LABEL[source.sourceType]}`,
           `Título: ${source.title}`,
           `Link: ${source.href}`,

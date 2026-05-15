@@ -533,7 +533,7 @@ export default function NewMeetingPage() {
                 {quickNotes.map((note) => (
                   <article key={note.id} className="rounded-lg border border-[#c2c6d4] bg-white p-4 shadow-sm">
                     <div className="mb-2 flex items-start justify-between gap-2">
-                      <span className={cn('rounded px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider', quickTypeClass[note.type])}>
+                      <span className={cn('rounded-lg px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider', quickTypeClass[note.type])}>
                         {quickTypeLabel[note.type]}
                       </span>
                       <span className="font-mono text-xs text-[#727783]">{note.timestamp}</span>

@@ -3,6 +3,7 @@ import type { OrganizationRole, ProjectRole } from '@prisma/client';
 import { prisma } from '../../config/prisma';
 import { AppError } from '../../shared/app-error';
 import { logger } from '../../shared/logger';
+import { projectVisibilityWhere, resolveProjectAccess } from '../../shared/project-access';
 import { aiSearchIndexService } from '../ai-search/ai-search-index.service';
 import { notificationEventService } from '../notifications/notification-event.service';
 
@@ -107,62 +108,19 @@ export class ProjectsService {
     };
   }
 
-  private async assertProjectExists(organizationId: string, projectId: string): Promise<void> {
-    const project = await prisma.project.findFirst({
-      where: {
-        id: projectId,
-        organizationId
-      },
-      select: {
-        id: true
-      }
-    });
-
-    if (!project) {
-      throw new AppError(404, 'Projeto não encontrado.');
-    }
-  }
-
   private async assertCanManageMembers(input: {
     organizationId: string;
     projectId: string;
     actorUserId: string;
     actorOrganizationRole: OrganizationRole;
   }): Promise<void> {
-    const project = await prisma.project.findFirst({
-      where: {
-        id: input.projectId,
-        organizationId: input.organizationId
-      },
-      select: {
-        id: true,
-        members: {
-          where: {
-            userId: input.actorUserId
-          },
-          select: {
-            role: true
-          },
-          take: 1
-        }
-      }
+    await resolveProjectAccess({
+      organizationId: input.organizationId,
+      projectId: input.projectId,
+      userId: input.actorUserId,
+      organizationRole: input.actorOrganizationRole,
+      requiredAccess: 'admin'
     });
-
-    if (!project) {
-      throw new AppError(404, 'Projeto não encontrado.');
-    }
-
-    if (input.actorOrganizationRole === 'OWNER' || input.actorOrganizationRole === 'ADMIN') {
-      return;
-    }
-
-    const actorProjectRole = project.members[0]?.role;
-
-    if (actorProjectRole === 'OWNER' || actorProjectRole === 'ADMIN') {
-      return;
-    }
-
-    throw new AppError(403, 'Sem permissão para gerenciar membros deste projeto.');
   }
 
   private async assertNotRemovingLastProjectOwner(
@@ -232,11 +190,17 @@ export class ProjectsService {
     };
   }
 
-  async listProjects(organizationId: string): Promise<ProjectSummary[]> {
+  async listProjects(input: {
+    organizationId: string;
+    userId: string;
+    organizationRole: OrganizationRole;
+  }): Promise<ProjectSummary[]> {
     const projects = await prisma.project.findMany({
-      where: {
-        organizationId
-      },
+      where: projectVisibilityWhere({
+        organizationId: input.organizationId,
+        userId: input.userId,
+        organizationRole: input.organizationRole
+      }),
       include: {
         _count: {
           select: {
@@ -322,14 +286,32 @@ export class ProjectsService {
       projectId: createdProject.id
     });
 
-    return this.getProjectById(input.organizationId, createdProject.id);
+    return this.getProjectById({
+      organizationId: input.organizationId,
+      projectId: createdProject.id,
+      userId: input.createdByUserId,
+      organizationRole: 'OWNER'
+    });
   }
 
-  async getProjectById(organizationId: string, projectId: string): Promise<ProjectDetail> {
+  async getProjectById(input: {
+    organizationId: string;
+    projectId: string;
+    userId: string;
+    organizationRole: OrganizationRole;
+  }): Promise<ProjectDetail> {
+    await resolveProjectAccess({
+      organizationId: input.organizationId,
+      projectId: input.projectId,
+      userId: input.userId,
+      organizationRole: input.organizationRole,
+      requiredAccess: 'read'
+    });
+
     const project = await prisma.project.findFirst({
       where: {
-        id: projectId,
-        organizationId
+        id: input.projectId,
+        organizationId: input.organizationId
       },
       include: {
         members: {
@@ -484,8 +466,16 @@ export class ProjectsService {
   async listProjectMembers(input: {
     organizationId: string;
     projectId: string;
+    userId: string;
+    organizationRole: OrganizationRole;
   }): Promise<ProjectMemberSummary[]> {
-    await this.assertProjectExists(input.organizationId, input.projectId);
+    await resolveProjectAccess({
+      organizationId: input.organizationId,
+      projectId: input.projectId,
+      userId: input.userId,
+      organizationRole: input.organizationRole,
+      requiredAccess: 'read'
+    });
 
     const members = await prisma.projectMember.findMany({
       where: {
@@ -716,27 +706,23 @@ export class ProjectsService {
   async updateProject(input: {
     organizationId: string;
     projectId: string;
+    userId: string;
+    organizationRole: OrganizationRole;
     name?: string;
     description?: string | null;
     color?: string | null;
   }): Promise<ProjectDetail> {
-    const project = await prisma.project.findFirst({
-      where: {
-        id: input.projectId,
-        organizationId: input.organizationId
-      },
-      select: {
-        id: true
-      }
+    const projectAccess = await resolveProjectAccess({
+      organizationId: input.organizationId,
+      projectId: input.projectId,
+      userId: input.userId,
+      organizationRole: input.organizationRole,
+      requiredAccess: 'write'
     });
-
-    if (!project) {
-      throw new AppError(404, 'Projeto não encontrado.');
-    }
 
     await prisma.project.update({
       where: {
-        id: project.id
+        id: projectAccess.project.id
       },
       data: {
         name: input.name?.trim(),
@@ -752,17 +738,35 @@ export class ProjectsService {
 
     await aiSearchIndexService.indexProjectById({
       organizationId: input.organizationId,
-      projectId: project.id
+      projectId: projectAccess.project.id
     });
 
-    return this.getProjectById(input.organizationId, project.id);
+    return this.getProjectById({
+      organizationId: input.organizationId,
+      projectId: projectAccess.project.id,
+      userId: input.userId,
+      organizationRole: input.organizationRole
+    });
   }
 
-  async deleteProject(organizationId: string, projectId: string): Promise<void> {
+  async deleteProject(input: {
+    organizationId: string;
+    projectId: string;
+    userId: string;
+    organizationRole: OrganizationRole;
+  }): Promise<void> {
+    const projectAccess = await resolveProjectAccess({
+      organizationId: input.organizationId,
+      projectId: input.projectId,
+      userId: input.userId,
+      organizationRole: input.organizationRole,
+      requiredAccess: 'admin'
+    });
+
     const project = await prisma.project.findFirst({
       where: {
-        id: projectId,
-        organizationId
+        id: projectAccess.project.id,
+        organizationId: input.organizationId
       },
       select: {
         id: true
@@ -774,7 +778,7 @@ export class ProjectsService {
     }
 
     await aiSearchIndexService.removeProjectChunks({
-      organizationId,
+      organizationId: input.organizationId,
       projectId: project.id
     });
 

@@ -1,4 +1,4 @@
-import type { OrganizationRole, Prisma } from '@prisma/client';
+import type { MeetingStatus, OrganizationRole, Prisma } from '@prisma/client';
 
 import { prisma } from '../../config/prisma';
 import { AppError } from '../../shared/app-error';
@@ -53,13 +53,38 @@ type OrganizationDashboard = {
     decision: string;
     createdAt: string;
   }>;
-  recentPendingItems: Array<{
-    meetingId: string;
-    meetingTitle: string;
+  recentMeetings: Array<{
+    id: string;
+    title: string;
+    status: MeetingStatus;
+    createdAt: string;
+    updatedAt: string;
+    hasTranscript: boolean;
+    hasAnalysis: boolean;
+    decisionsCount: number;
+    pendingItemsCount: number;
     project: {
       id: string;
       name: string;
     };
+  }>;
+  recentPendingItems: Array<{
+    meetingId: string | null;
+    meetingTitle: string | null;
+    project: {
+      id: string;
+      name: string;
+    };
+    cardId: string;
+    stage: string;
+    priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT' | null;
+    dueDate: string | null;
+    assignees: Array<{
+      id: string;
+      name: string;
+      email: string;
+      avatarUrl: string | null;
+    }>;
     item: string;
     createdAt: string;
   }>;
@@ -308,11 +333,23 @@ export class OrganizationsService {
 
   async getOrganizationDashboard(input: {
     organizationId: string;
-    days: number;
+    days?: number;
+    from?: Date;
+    to?: Date;
   }): Promise<OrganizationDashboard> {
-    const now = new Date();
-    const periodDays = Math.max(7, Math.min(input.days, 365));
-    const periodStart = new Date(now.getTime() - periodDays * 24 * 60 * 60 * 1000);
+    const periodEnd = input.to ?? new Date();
+    const requestedDays = Math.max(1, Math.min(input.days ?? 30, 365));
+    const periodStart =
+      input.from ?? new Date(periodEnd.getTime() - requestedDays * 24 * 60 * 60 * 1000);
+
+    if (periodStart.getTime() > periodEnd.getTime()) {
+      throw new AppError(400, 'Período inválido para dashboard.');
+    }
+
+    const periodDays = Math.max(
+      1,
+      Math.ceil((periodEnd.getTime() - periodStart.getTime()) / (24 * 60 * 60 * 1000))
+    );
 
     const organization = await prisma.organization.findUnique({
       where: {
@@ -339,7 +376,8 @@ export class OrganizationsService {
       recentObservations,
       recentCards,
       recentFiles,
-      recentMembers
+      recentMembers,
+      organizationActionCards
     ] = await Promise.all([
       prisma.project.count({
         where: {
@@ -353,7 +391,7 @@ export class OrganizationsService {
           },
           createdAt: {
             gte: periodStart,
-            lte: now
+            lte: periodEnd
           }
         }
       }),
@@ -376,7 +414,7 @@ export class OrganizationsService {
         where: {
           createdAt: {
             gte: periodStart,
-            lte: now
+            lte: periodEnd
           },
           meeting: {
             project: {
@@ -413,13 +451,25 @@ export class OrganizationsService {
           },
           createdAt: {
             gte: periodStart,
-            lte: now
+            lte: periodEnd
           }
         },
         select: {
           id: true,
           title: true,
+          status: true,
           createdAt: true,
+          updatedAt: true,
+          transcript: {
+            select: {
+              id: true
+            }
+          },
+          note: {
+            select: {
+              id: true
+            }
+          },
           project: {
             select: {
               id: true,
@@ -443,7 +493,7 @@ export class OrganizationsService {
         where: {
           createdAt: {
             gte: periodStart,
-            lte: now
+            lte: periodEnd
           },
           meeting: {
             project: {
@@ -488,7 +538,7 @@ export class OrganizationsService {
           },
           createdAt: {
             gte: periodStart,
-            lte: now
+            lte: periodEnd
           }
         },
         select: {
@@ -522,7 +572,7 @@ export class OrganizationsService {
           },
           createdAt: {
             gte: periodStart,
-            lte: now
+            lte: periodEnd
           }
         },
         select: {
@@ -553,7 +603,7 @@ export class OrganizationsService {
           organizationId: input.organizationId,
           createdAt: {
             gte: periodStart,
-            lte: now
+            lte: periodEnd
           }
         },
         select: {
@@ -572,6 +622,51 @@ export class OrganizationsService {
           createdAt: 'desc'
         },
         take: 25
+      }),
+      prisma.card.findMany({
+        where: {
+          project: {
+            organizationId: input.organizationId
+          }
+        },
+        select: {
+          id: true,
+          title: true,
+          priority: true,
+          dueDate: true,
+          createdAt: true,
+          updatedAt: true,
+          meetingId: true,
+          meeting: {
+            select: {
+              id: true,
+              title: true
+            }
+          },
+          project: {
+            select: {
+              id: true,
+              name: true
+            }
+          },
+          boardColumn: {
+            select: {
+              title: true
+            }
+          },
+          assignees: {
+            include: {
+              user: {
+                select: {
+                  id: true,
+                  name: true,
+                  email: true,
+                  avatarUrl: true
+                }
+              }
+            }
+          }
+        }
       })
     ]);
 
@@ -580,11 +675,17 @@ export class OrganizationsService {
     ).length;
 
     const recentDecisions: OrganizationDashboard['recentDecisions'] = [];
-    const recentPendingItems: OrganizationDashboard['recentPendingItems'] = [];
+    const noteSummaryByMeetingId = new Map<string, { decisionsCount: number; pendingItemsCount: number }>();
 
     for (const note of recentNotes) {
       const decisions = this.parseStringArray(note.decisionsJson);
       const pendingItems = this.parseStringArray(note.pendingItemsJson);
+
+      const previousSummary = noteSummaryByMeetingId.get(note.meeting.id);
+      noteSummaryByMeetingId.set(note.meeting.id, {
+        decisionsCount: (previousSummary?.decisionsCount ?? 0) + decisions.length,
+        pendingItemsCount: (previousSummary?.pendingItemsCount ?? 0) + pendingItems.length
+      });
 
       decisions.forEach((decision) => {
         recentDecisions.push({
@@ -598,20 +699,78 @@ export class OrganizationsService {
           createdAt: note.createdAt.toISOString()
         });
       });
-
-      pendingItems.forEach((item) => {
-        recentPendingItems.push({
-          meetingId: note.meeting.id,
-          meetingTitle: note.meeting.title,
-          project: {
-            id: note.meeting.project.id,
-            name: note.meeting.project.name
-          },
-          item,
-          createdAt: note.createdAt.toISOString()
-        });
-      });
     }
+
+    const recentMeetingItems: OrganizationDashboard['recentMeetings'] = recentMeetings
+      .sort((left, right) => right.createdAt.getTime() - left.createdAt.getTime())
+      .slice(0, 80)
+      .map((meeting) => {
+        const summary = noteSummaryByMeetingId.get(meeting.id);
+
+        return {
+          id: meeting.id,
+          title: meeting.title,
+          status: meeting.status,
+          createdAt: meeting.createdAt.toISOString(),
+          updatedAt: meeting.updatedAt.toISOString(),
+          hasTranscript: Boolean(meeting.transcript),
+          hasAnalysis: Boolean(meeting.note),
+          decisionsCount: summary?.decisionsCount ?? 0,
+          pendingItemsCount: summary?.pendingItemsCount ?? 0,
+          project: {
+            id: meeting.project.id,
+            name: meeting.project.name
+          }
+        };
+      });
+
+    const priorityOrder: Record<'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT', number> = {
+      URGENT: 0,
+      HIGH: 1,
+      MEDIUM: 2,
+      LOW: 3
+    };
+
+    const recentPendingItems: OrganizationDashboard['recentPendingItems'] = organizationActionCards
+      .filter((card) => !this.isClosedColumnTitle(card.boardColumn.title))
+      .sort((left, right) => {
+        const leftDue = left.dueDate ? left.dueDate.getTime() : Number.POSITIVE_INFINITY;
+        const rightDue = right.dueDate ? right.dueDate.getTime() : Number.POSITIVE_INFINITY;
+
+        if (leftDue !== rightDue) {
+          return leftDue - rightDue;
+        }
+
+        const leftPriority = left.priority ? priorityOrder[left.priority] : 99;
+        const rightPriority = right.priority ? priorityOrder[right.priority] : 99;
+
+        if (leftPriority !== rightPriority) {
+          return leftPriority - rightPriority;
+        }
+
+        return right.updatedAt.getTime() - left.updatedAt.getTime();
+      })
+      .slice(0, 12)
+      .map((card) => ({
+        meetingId: card.meetingId,
+        meetingTitle: card.meeting?.title ?? null,
+        project: {
+          id: card.project.id,
+          name: card.project.name
+        },
+        cardId: card.id,
+        stage: card.boardColumn.title,
+        priority: card.priority,
+        dueDate: card.dueDate?.toISOString() ?? null,
+        assignees: card.assignees.map((assignee) => ({
+          id: assignee.user.id,
+          name: assignee.user.name,
+          email: assignee.user.email,
+          avatarUrl: assignee.user.avatarUrl
+        })),
+        item: card.title,
+        createdAt: card.createdAt.toISOString()
+      }));
 
     const activity: OrganizationDashboard['teamRecentActivity'] = [
       ...recentMeetings.map((meeting) => ({
@@ -668,7 +827,7 @@ export class OrganizationsService {
       period: {
         days: periodDays,
         from: periodStart.toISOString(),
-        to: now.toISOString()
+        to: periodEnd.toISOString()
       },
       metrics: {
         projects: projectsCount,
@@ -680,6 +839,7 @@ export class OrganizationsService {
       recentDecisions: recentDecisions
         .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
         .slice(0, 12),
+      recentMeetings: recentMeetingItems,
       recentPendingItems: recentPendingItems
         .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
         .slice(0, 12),

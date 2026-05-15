@@ -53,6 +53,10 @@ const sendMessageSchema = z
     }
   });
 
+const renameThreadSchema = z.object({
+  title: z.string().trim().min(2).max(160)
+});
+
 const suggestionsQuerySchema = z.object({
   projectId: z.string().uuid('ID de projeto inválido.').optional()
 });
@@ -81,6 +85,7 @@ export class AiSearchController {
     const threads = await aiSearchThreadService.listThreads({
       organizationId: auth.organizationId,
       userId: auth.userId,
+      organizationRole: auth.role,
       projectId: query.projectId,
       includeArchived: query.includeArchived
     });
@@ -95,6 +100,7 @@ export class AiSearchController {
     const thread = await aiSearchThreadService.getThread({
       organizationId: auth.organizationId,
       userId: auth.userId,
+      organizationRole: auth.role,
       threadId: params.id
     });
 
@@ -117,6 +123,22 @@ export class AiSearchController {
     });
 
     res.status(201).json(responsePayload);
+  }
+
+  async renameThread(req: Request, res: Response): Promise<void> {
+    const auth = this.assertAuth(req);
+    const params = this.parse(threadIdParamsSchema, req.params, 'Parâmetros inválidos para renomear histórico.');
+    const payload = this.parse(renameThreadSchema, req.body ?? {}, 'Payload inválido para renomear histórico.');
+
+    const thread = await aiSearchThreadService.renameThread({
+      organizationId: auth.organizationId,
+      userId: auth.userId,
+      organizationRole: auth.role,
+      threadId: params.id,
+      title: payload.title
+    });
+
+    res.json(thread);
   }
 
   async archiveThread(req: Request, res: Response): Promise<void> {

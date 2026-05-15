@@ -6,9 +6,9 @@ import {
   ChevronLeft,
   ChevronRight,
   Lock,
+  Mail,
   Shield,
   UserPlus2,
-  UserRound,
   UserX,
   X
 } from 'lucide-react';
@@ -26,7 +26,12 @@ import { RoleBadge } from '@/components/ui/role-badge';
 import { SearchInput } from '@/components/ui/search-input';
 import { ApiError, api } from '@/lib/api';
 import { useAppSession } from '@/lib/app-session';
-import type { MemberRole, OrganizationMemberSummary } from '@/types/domain';
+import type {
+  CollaboratorInvitationSummary,
+  MemberRole,
+  OrganizationMemberSummary,
+  ProjectSummary
+} from '@/types/domain';
 
 const ALL_ROLES: MemberRole[] = ['OWNER', 'ADMIN', 'MEMBER', 'VIEWER'];
 
@@ -67,11 +72,13 @@ export default function TeamPage() {
   const session = useAppSession();
 
   const [members, setMembers] = useState<OrganizationMemberSummary[]>([]);
+  const [projects, setProjects] = useState<ProjectSummary[]>([]);
+  const [pendingInvitations, setPendingInvitations] = useState<CollaboratorInvitationSummary[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [isAdding, setIsAdding] = useState(false);
+  const [isInviting, setIsInviting] = useState(false);
   const [isMutatingMemberId, setIsMutatingMemberId] = useState<string | null>(null);
 
-  const [showAddForm, setShowAddForm] = useState(false);
+  const [showInviteModal, setShowInviteModal] = useState(false);
   const [activeTab, setActiveTab] = useState<TeamTab>('all');
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -81,10 +88,9 @@ export default function TeamPage() {
   const [roleDrafts, setRoleDrafts] = useState<Record<string, MemberRole>>({});
   const [roleEditorFor, setRoleEditorFor] = useState<string | null>(null);
 
-  const [memberName, setMemberName] = useState('');
-  const [memberEmail, setMemberEmail] = useState('');
-  const [memberPassword, setMemberPassword] = useState('');
-  const [memberRole, setMemberRole] = useState<MemberRole>('MEMBER');
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [inviteRole, setInviteRole] = useState<MemberRole>('MEMBER');
+  const [inviteProjectIds, setInviteProjectIds] = useState<string[]>([]);
 
   useConfigureAppShell({
     title: 'Equipe',
@@ -103,7 +109,7 @@ export default function TeamPage() {
     [session?.activeOrganization.role]
   );
 
-  const loadMembers = useCallback(async () => {
+  const loadData = useCallback(async () => {
     if (!session?.token) {
       return;
     }
@@ -112,11 +118,20 @@ export default function TeamPage() {
     setErrorMessage(null);
 
     try {
-      const payload = await api.listOrganizationMembers(session.token);
+      const [membersPayload, projectsPayload, invitationsPayload] = await Promise.all([
+        api.listOrganizationMembers(session.token),
+        api.listProjects(session.token),
+        canManageTeam
+          ? api.listPendingCollaboratorInvitations(session.token)
+          : Promise.resolve({ invitations: [] as CollaboratorInvitationSummary[] })
+      ]);
 
-      setMembers(payload.members);
+      setMembers(membersPayload.members);
+      setProjects(projectsPayload.projects);
+      setPendingInvitations(invitationsPayload.invitations);
+
       setRoleDrafts(
-        payload.members.reduce<Record<string, MemberRole>>((acc, member) => {
+        membersPayload.members.reduce<Record<string, MemberRole>>((acc, member) => {
           acc[member.memberId] = member.role;
           return acc;
         }, {})
@@ -125,22 +140,18 @@ export default function TeamPage() {
       if (error instanceof ApiError) {
         setErrorMessage(error.message);
       } else {
-        setErrorMessage('Não foi possível carregar a equipe.');
+        setErrorMessage('Não foi possível carregar dados da equipe.');
       }
     } finally {
       setIsLoading(false);
     }
-  }, [session?.token]);
+  }, [canManageTeam, session?.token]);
 
   useEffect(() => {
-    void loadMembers();
-  }, [loadMembers]);
+    void loadData();
+  }, [loadData]);
 
   const displayedMembers = useMemo(() => {
-    if (activeTab === 'pending') {
-      return [] as OrganizationMemberSummary[];
-    }
-
     const query = searchTerm.trim().toLowerCase();
 
     if (!query) {
@@ -153,7 +164,24 @@ export default function TeamPage() {
 
       return name.includes(query) || email.includes(query);
     });
-  }, [activeTab, members, searchTerm]);
+  }, [members, searchTerm]);
+
+  const displayedInvitations = useMemo(() => {
+    const query = searchTerm.trim().toLowerCase();
+
+    if (!query) {
+      return pendingInvitations;
+    }
+
+    return pendingInvitations.filter((invitation) => {
+      const projectsLabel = invitation.projects.map((project) => project.name).join(' ').toLowerCase();
+      return (
+        invitation.email.toLowerCase().includes(query) ||
+        invitation.role.toLowerCase().includes(query) ||
+        projectsLabel.includes(query)
+      );
+    });
+  }, [pendingInvitations, searchTerm]);
 
   const ownerCount = useMemo(
     () => members.filter((member) => member.role === 'OWNER').length,
@@ -179,41 +207,59 @@ export default function TeamPage() {
     [canManageTeam, session]
   );
 
-  const handleAddMember = async (event: React.FormEvent<HTMLFormElement>) => {
+  const toggleInviteProject = (projectId: string) => {
+    setInviteProjectIds((current) => {
+      if (current.includes(projectId)) {
+        return current.filter((entry) => entry !== projectId);
+      }
+
+      return [...current, projectId];
+    });
+  };
+
+  const handleInviteCollaborator = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
     if (!session?.token || !canManageTeam) {
       return;
     }
 
-    setIsAdding(true);
+    if (inviteProjectIds.length === 0) {
+      setErrorMessage('Selecione ao menos um projeto para o convite.');
+      return;
+    }
+
+    setIsInviting(true);
     setErrorMessage(null);
     setSuccessMessage(null);
 
     try {
-      const created = await api.addOrganizationMember(session.token, {
-        fullName: memberName,
-        email: memberEmail,
-        password: memberPassword || undefined,
-        role: memberRole
+      const result = await api.inviteCollaborator(session.token, {
+        email: inviteEmail.trim(),
+        role: inviteRole,
+        projectIds: inviteProjectIds
       });
 
-      setMembers((current) => [...current, created]);
-      setRoleDrafts((current) => ({ ...current, [created.memberId]: created.role }));
-      setMemberName('');
-      setMemberEmail('');
-      setMemberPassword('');
-      setMemberRole('MEMBER');
-      setShowAddForm(false);
-      setSuccessMessage('Colaborador adicionado com sucesso.');
+      setPendingInvitations((current) => [result.invitation, ...current]);
+      setInviteEmail('');
+      setInviteRole('MEMBER');
+      setInviteProjectIds([]);
+      setShowInviteModal(false);
+      setActiveTab('pending');
+
+      if (result.emailSent) {
+        setSuccessMessage('Convite enviado por e-mail com sucesso.');
+      } else {
+        setSuccessMessage('Convite criado, mas o envio de e-mail não foi confirmado pelo SMTP.');
+      }
     } catch (error) {
       if (error instanceof ApiError) {
         setErrorMessage(error.message);
       } else {
-        setErrorMessage('Não foi possível adicionar colaborador.');
+        setErrorMessage('Não foi possível enviar o convite.');
       }
     } finally {
-      setIsAdding(false);
+      setIsInviting(false);
     }
   };
 
@@ -288,13 +334,13 @@ export default function TeamPage() {
     <>
       <PageHeader
         title="Gestão da equipe"
-        description="Gerencie os membros da organização e seus níveis de acesso."
+        description="Convide colaboradores, controle papéis e mantenha acesso por projeto."
         actions={
           canManageTeam ? (
             <PageActions>
-              <Button variant="secondary" onClick={() => setShowAddForm(true)} className="gap-2">
+              <Button variant="secondary" onClick={() => setShowInviteModal(true)} className="gap-2">
                 <UserPlus2 className="h-4 w-4" />
-                Adicionar colaborador
+                Convidar colaborador
               </Button>
             </PageActions>
           ) : null
@@ -306,27 +352,27 @@ export default function TeamPage() {
           <div className="flex flex-wrap items-center justify-between gap-3">
             <AppTabs
               value={activeTab}
-              onChange={(value) => setActiveTab(value)}
+              onChange={(value) => setActiveTab(value as TeamTab)}
               items={[
                 { id: 'all', label: 'Todos os membros' },
                 { id: 'pending', label: 'Convites pendentes' }
               ]}
             />
             <div className="w-full max-w-xs">
-              <SearchInput value={searchTerm} onChange={setSearchTerm} placeholder="Buscar membro" />
+              <SearchInput value={searchTerm} onChange={setSearchTerm} placeholder="Buscar" />
             </div>
           </div>
         }
         footer={
           <div className="flex items-center justify-between gap-3">
             <p className="text-sm text-app-muted">
-              Mostrando {displayedMembers.length === 0 ? 0 : 1} a {displayedMembers.length} de {displayedMembers.length} resultados
+              Mostrando {activeTab === 'all' ? displayedMembers.length : displayedInvitations.length} resultado(s)
             </p>
             <div className="flex gap-1">
               <button
                 type="button"
                 disabled
-                className="rounded p-1 text-[#c2c6d4] disabled:opacity-60"
+                className="rounded-lg p-1 text-[#c2c6d4] disabled:opacity-60"
                 aria-label="Página anterior"
               >
                 <ChevronLeft className="h-4 w-4" />
@@ -334,7 +380,7 @@ export default function TeamPage() {
               <button
                 type="button"
                 disabled
-                className="rounded p-1 text-[#c2c6d4] disabled:opacity-60"
+                className="rounded-lg p-1 text-[#c2c6d4] disabled:opacity-60"
                 aria-label="Próxima página"
               >
                 <ChevronRight className="h-4 w-4" />
@@ -343,214 +389,244 @@ export default function TeamPage() {
           </div>
         }
       >
-        <thead>
-          <tr className="border-b border-app bg-app/25">
-            <th className="px-6 py-4 text-xs font-bold uppercase tracking-[0.05em] text-app-muted">Membro</th>
-            <th className="px-6 py-4 text-xs font-bold uppercase tracking-[0.05em] text-app-muted">E-mail</th>
-            <th className="px-6 py-4 text-xs font-bold uppercase tracking-[0.05em] text-app-muted">Papel</th>
-            <th className="px-6 py-4 text-xs font-bold uppercase tracking-[0.05em] text-app-muted">Entrada</th>
-            <th className="px-6 py-4 text-right text-xs font-bold uppercase tracking-[0.05em] text-app-muted">Ações</th>
-          </tr>
-        </thead>
+        {activeTab === 'all' ? (
+          <>
+            <thead>
+              <tr className="border-b border-app bg-app/25">
+                <th className="px-6 py-4 text-xs font-bold uppercase tracking-[0.05em] text-app-muted">Membro</th>
+                <th className="px-6 py-4 text-xs font-bold uppercase tracking-[0.05em] text-app-muted">E-mail</th>
+                <th className="px-6 py-4 text-xs font-bold uppercase tracking-[0.05em] text-app-muted">Papel</th>
+                <th className="px-6 py-4 text-xs font-bold uppercase tracking-[0.05em] text-app-muted">Entrada</th>
+                <th className="px-6 py-4 text-right text-xs font-bold uppercase tracking-[0.05em] text-app-muted">Ações</th>
+              </tr>
+            </thead>
 
-        <tbody className="divide-y divide-app">
-          {isLoading ? (
-            <tr>
-              <td className="px-6 py-8 text-sm text-app-muted" colSpan={5}>
-                Carregando membros...
-              </td>
-            </tr>
-          ) : null}
+            <tbody className="divide-y divide-app">
+              {isLoading ? (
+                <tr>
+                  <td className="px-6 py-8 text-sm text-app-muted" colSpan={5}>
+                    Carregando membros...
+                  </td>
+                </tr>
+              ) : null}
 
-          {!isLoading && displayedMembers.length === 0 ? (
-            <tr>
-              <td className="px-6 py-8" colSpan={5}>
-                <EmptyState
-                  title={activeTab === 'pending' ? 'Nenhum convite pendente' : 'Nenhum membro encontrado'}
-                  description="Ajuste os filtros ou adicione um novo colaborador para a organização."
-                />
-              </td>
-            </tr>
-          ) : null}
+              {!isLoading && displayedMembers.length === 0 ? (
+                <tr>
+                  <td className="px-6 py-8" colSpan={5}>
+                    <EmptyState
+                      title="Nenhum membro encontrado"
+                      description="Ajuste os filtros ou convide um novo colaborador."
+                    />
+                  </td>
+                </tr>
+              ) : null}
 
-          {!isLoading
-            ? displayedMembers.map((member) => {
-                const editable = canEditMember(member);
-                const busy = isMutatingMemberId === member.memberId;
-                const currentDraftRole = roleDrafts[member.memberId] ?? member.role;
-                const roleEditorOpen = roleEditorFor === member.memberId;
+              {!isLoading
+                ? displayedMembers.map((member) => {
+                    const editable = canEditMember(member);
+                    const busy = isMutatingMemberId === member.memberId;
+                    const currentDraftRole = roleDrafts[member.memberId] ?? member.role;
+                    const roleEditorOpen = roleEditorFor === member.memberId;
 
-                return (
-                  <tr key={member.memberId} className="group transition-colors hover:bg-white/70">
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-3">
-                        <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-[10px] border border-app bg-app text-sm font-semibold text-[#424752]">
-                          {getInitial(member.user.fullName)}
-                        </div>
-                        <div className="text-sm font-semibold text-[#191c21]">{member.user.fullName}</div>
-                      </div>
-                    </td>
+                    return (
+                      <tr key={member.memberId} className="group transition-colors hover:bg-white/70">
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-3">
+                            <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-xl border border-app bg-app text-sm font-semibold text-[#424752]">
+                              {getInitial(member.user.fullName)}
+                            </div>
+                            <div className="text-sm font-semibold text-[#191c21]">{member.user.fullName}</div>
+                          </div>
+                        </td>
 
-                    <td className="px-6 py-4 text-sm text-[#424752]">{member.user.email}</td>
+                        <td className="px-6 py-4 text-sm text-[#424752]">{member.user.email}</td>
 
-                    <td className="px-6 py-4">
-                      <RoleBadge role={member.role} />
-                    </td>
+                        <td className="px-6 py-4">
+                          <RoleBadge role={member.role} />
+                        </td>
 
-                    <td className="px-6 py-4 text-sm text-[#424752]">{formatJoinDate(member.createdAt)}</td>
+                        <td className="px-6 py-4 text-sm text-[#424752]">{formatJoinDate(member.createdAt)}</td>
 
-                    <td className="px-6 py-4 text-right">
-                      {editable ? (
-                        <div className="inline-flex items-center justify-end gap-2 transition-opacity group-hover:opacity-100 md:opacity-0">
-                          {roleEditorOpen ? (
-                            <>
-                              <select
-                                className="h-8 rounded-md border border-app bg-white px-2 text-xs text-[#191c21]"
-                                value={currentDraftRole}
-                                onChange={(event) =>
-                                  setRoleDrafts((current) => ({
-                                    ...current,
-                                    [member.memberId]: event.target.value as MemberRole
-                                  }))
-                                }
-                                disabled={busy}
-                              >
-                                {roleOptions.map((role) => (
-                                  <option key={role} value={role}>
-                                    {roleLabel[role]}
-                                  </option>
-                                ))}
-                              </select>
+                        <td className="px-6 py-4 text-right">
+                          {editable ? (
+                            <div className="inline-flex items-center justify-end gap-2 transition-opacity group-hover:opacity-100 md:opacity-0">
+                              {roleEditorOpen ? (
+                                <>
+                                  <select
+                                    className="h-8 rounded-lg border border-app bg-white px-2 text-xs text-[#191c21]"
+                                    value={currentDraftRole}
+                                    onChange={(event) =>
+                                      setRoleDrafts((current) => ({
+                                        ...current,
+                                        [member.memberId]: event.target.value as MemberRole
+                                      }))
+                                    }
+                                    disabled={busy}
+                                  >
+                                    {roleOptions.map((role) => (
+                                      <option key={role} value={role}>
+                                        {roleLabel[role]}
+                                      </option>
+                                    ))}
+                                  </select>
 
-                              <button
-                                type="button"
-                                onClick={() => void handleUpdateRole(member)}
-                                disabled={busy}
-                                className="rounded-md p-1.5 text-brand transition-colors hover:bg-app-active disabled:opacity-60"
-                                title="Salvar papel"
-                              >
-                                <Check className="h-4 w-4" />
-                              </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => void handleUpdateRole(member)}
+                                    disabled={busy}
+                                    className="rounded-lg p-1.5 text-brand transition-colors hover:bg-app-active disabled:opacity-60"
+                                    title="Salvar papel"
+                                  >
+                                    <Check className="h-4 w-4" />
+                                  </button>
 
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setRoleEditorFor(null);
-                                  setRoleDrafts((current) => ({
-                                    ...current,
-                                    [member.memberId]: member.role
-                                  }));
-                                }}
-                                disabled={busy}
-                                className="rounded-md p-1.5 text-app-muted transition-colors hover:bg-app-active disabled:opacity-60"
-                                title="Cancelar"
-                              >
-                                <X className="h-4 w-4" />
-                              </button>
-                            </>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setRoleEditorFor(null);
+                                      setRoleDrafts((current) => ({
+                                        ...current,
+                                        [member.memberId]: member.role
+                                      }));
+                                    }}
+                                    disabled={busy}
+                                    className="rounded-lg p-1.5 text-app-muted transition-colors hover:bg-app-active disabled:opacity-60"
+                                    title="Cancelar"
+                                  >
+                                    <X className="h-4 w-4" />
+                                  </button>
+                                </>
+                              ) : (
+                                <>
+                                  <button
+                                    type="button"
+                                    onClick={() => setRoleEditorFor(member.memberId)}
+                                    disabled={busy}
+                                    className="rounded-lg p-1.5 text-app-muted transition-colors hover:bg-app-active hover:text-brand disabled:opacity-60"
+                                    title="Editar papel"
+                                  >
+                                    <Shield className="h-4 w-4" />
+                                  </button>
+
+                                  <button
+                                    type="button"
+                                    onClick={() => void handleRemoveMember(member)}
+                                    disabled={busy}
+                                    className="rounded-lg p-1.5 text-app-muted transition-colors hover:bg-red-50 hover:text-red-700 disabled:opacity-60"
+                                    title="Remover membro"
+                                  >
+                                    <UserX className="h-4 w-4" />
+                                  </button>
+                                </>
+                              )}
+                            </div>
+                          ) : canManageTeam ? (
+                            <div className="inline-flex items-center gap-1 text-[#c2c6d4]" title="Sem permissão para editar este membro">
+                              <Lock className="h-4 w-4" />
+                            </div>
                           ) : (
-                            <>
-                              <button
-                                type="button"
-                                onClick={() => setRoleEditorFor(member.memberId)}
-                                disabled={busy}
-                                className="rounded-md p-1.5 text-app-muted transition-colors hover:bg-app-active hover:text-brand disabled:opacity-60"
-                                title="Editar papel"
-                              >
-                                <Shield className="h-4 w-4" />
-                              </button>
-
-                              <button
-                                type="button"
-                                onClick={() => void handleRemoveMember(member)}
-                                disabled={busy}
-                                className="rounded-md p-1.5 text-app-muted transition-colors hover:bg-red-50 hover:text-red-700 disabled:opacity-60"
-                                title="Remover membro"
-                              >
-                                <UserX className="h-4 w-4" />
-                              </button>
-                            </>
+                            <span className="text-xs text-[#c2c6d4]">-</span>
                           )}
-                        </div>
-                      ) : canManageTeam ? (
-                        <div className="inline-flex items-center gap-1 text-[#c2c6d4]" title="Sem permissão para editar este membro">
-                          <Lock className="h-4 w-4" />
-                        </div>
-                      ) : (
-                        <span className="text-xs text-[#c2c6d4]">-</span>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })
-            : null}
-        </tbody>
+                        </td>
+                      </tr>
+                    );
+                  })
+                : null}
+            </tbody>
+          </>
+        ) : (
+          <>
+            <thead>
+              <tr className="border-b border-app bg-app/25">
+                <th className="px-6 py-4 text-xs font-bold uppercase tracking-[0.05em] text-app-muted">E-mail</th>
+                <th className="px-6 py-4 text-xs font-bold uppercase tracking-[0.05em] text-app-muted">Papel</th>
+                <th className="px-6 py-4 text-xs font-bold uppercase tracking-[0.05em] text-app-muted">Projetos</th>
+                <th className="px-6 py-4 text-xs font-bold uppercase tracking-[0.05em] text-app-muted">Expira em</th>
+                <th className="px-6 py-4 text-xs font-bold uppercase tracking-[0.05em] text-app-muted">Convidado por</th>
+              </tr>
+            </thead>
+
+            <tbody className="divide-y divide-app">
+              {isLoading ? (
+                <tr>
+                  <td className="px-6 py-8 text-sm text-app-muted" colSpan={5}>
+                    Carregando convites...
+                  </td>
+                </tr>
+              ) : null}
+
+              {!isLoading && displayedInvitations.length === 0 ? (
+                <tr>
+                  <td className="px-6 py-8" colSpan={5}>
+                    <EmptyState
+                      title="Nenhum convite pendente"
+                      description="Novos convites aparecerão aqui até serem aceitos ou expirarem."
+                    />
+                  </td>
+                </tr>
+              ) : null}
+
+              {!isLoading
+                ? displayedInvitations.map((invitation) => (
+                    <tr key={invitation.id} className="transition-colors hover:bg-white/70">
+                      <td className="px-6 py-4 text-sm text-[#191c21]">{invitation.email}</td>
+                      <td className="px-6 py-4">
+                        <RoleBadge role={invitation.role} />
+                      </td>
+                      <td className="px-6 py-4 text-sm text-[#424752]">
+                        {invitation.projects.map((project) => project.name).join(', ')}
+                      </td>
+                      <td className="px-6 py-4 text-sm text-[#424752]">{formatJoinDate(invitation.expiresAt)}</td>
+                      <td className="px-6 py-4 text-sm text-[#424752]">{invitation.invitedBy.name}</td>
+                    </tr>
+                  ))
+                : null}
+            </tbody>
+          </>
+        )}
       </DataTable>
 
-            <div className="grid gap-3 md:grid-cols-2">
-              {errorMessage ? (
-                <p className="rounded-lg border border-[#ffdad6] bg-[#ffdad6]/40 px-4 py-3 text-sm text-[#93000a]">
-                  {errorMessage}
-                </p>
-              ) : null}
+      {(errorMessage || successMessage) ? (
+        <div className="grid gap-3 md:grid-cols-2">
+          {errorMessage ? (
+            <p className="rounded-lg border border-[#ffdad6] bg-[#ffdad6]/40 px-4 py-3 text-sm text-[#93000a]">
+              {errorMessage}
+            </p>
+          ) : null}
 
-              {successMessage ? (
-                <p className="rounded-lg border border-[#d6e3ff] bg-[#d6e3ff]/35 px-4 py-3 text-sm text-[#003a75]">
-                  {successMessage}
-                </p>
-              ) : null}
+          {successMessage ? (
+            <p className="rounded-lg border border-[#d6e3ff] bg-[#d6e3ff]/35 px-4 py-3 text-sm text-[#003a75]">
+              {successMessage}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
 
-              {!errorMessage && !successMessage ? (
-                <p className="rounded-lg border border-[#e1e2ea] bg-white px-4 py-3 text-sm text-[#727783] md:col-span-2">
-                  Organização: {session.activeOrganization.name} • Donos: {ownerCount} • Membros: {members.length}
-                </p>
-              ) : null}
-            </div>
       <AppModal
-        open={showAddForm && canManageTeam}
-        title="Adicionar colaborador"
-        onClose={() => setShowAddForm(false)}
-        className="max-w-md"
+        open={showInviteModal && canManageTeam}
+        title="Convidar colaborador"
+        onClose={() => setShowInviteModal(false)}
+        className="max-w-lg"
       >
-        <form className="space-y-3" onSubmit={handleAddMember}>
-          <FormField label="Nome completo">
+        <form className="space-y-3" onSubmit={handleInviteCollaborator}>
+          <FormField label="E-mail do colaborador">
             <div className="relative">
-              <UserRound className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#727783]" />
+              <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#727783]" />
               <input
-                type="text"
-                value={memberName}
-                onChange={(event) => setMemberName(event.target.value)}
-                className="h-10 w-full rounded-[10px] border border-[#d3dceb] bg-white pl-10 pr-3 text-sm text-[#191c21] outline-none transition-all focus:border-[#005EB8] focus:ring-2 focus:ring-[#005EB8]/15"
+                type="email"
+                value={inviteEmail}
+                onChange={(event) => setInviteEmail(event.target.value)}
+                className="h-10 w-full rounded-xl border border-[#d3dceb] bg-white pl-10 pr-3 text-sm text-[#191c21] outline-none transition-all focus:border-[#005EB8] focus:ring-2 focus:ring-[#005EB8]/15"
                 required
               />
             </div>
           </FormField>
 
-          <FormField label="E-mail">
-            <input
-              type="email"
-              value={memberEmail}
-              onChange={(event) => setMemberEmail(event.target.value)}
-              className="h-10 w-full rounded-[10px] border border-[#d3dceb] bg-white px-3 text-sm text-[#191c21] outline-none transition-all focus:border-[#005EB8] focus:ring-2 focus:ring-[#005EB8]/15"
-              required
-            />
-          </FormField>
-
-          <FormField label="Senha inicial (opcional)">
-            <input
-              type="password"
-              minLength={8}
-              value={memberPassword}
-              onChange={(event) => setMemberPassword(event.target.value)}
-              className="h-10 w-full rounded-[10px] border border-[#d3dceb] bg-white px-3 text-sm text-[#191c21] outline-none transition-all focus:border-[#005EB8] focus:ring-2 focus:ring-[#005EB8]/15"
-            />
-          </FormField>
-
           <FormField label="Papel">
             <select
-              value={memberRole}
-              onChange={(event) => setMemberRole(event.target.value as MemberRole)}
-              className="h-10 w-full rounded-[10px] border border-[#d3dceb] bg-white px-3 text-sm text-[#191c21] outline-none transition-all focus:border-[#005EB8] focus:ring-2 focus:ring-[#005EB8]/15"
+              value={inviteRole}
+              onChange={(event) => setInviteRole(event.target.value as MemberRole)}
+              className="h-10 w-full rounded-xl border border-[#d3dceb] bg-white px-3 text-sm text-[#191c21] outline-none transition-all focus:border-[#005EB8] focus:ring-2 focus:ring-[#005EB8]/15"
             >
               {roleOptions.map((role) => (
                 <option key={role} value={role}>
@@ -560,12 +636,36 @@ export default function TeamPage() {
             </select>
           </FormField>
 
+          <FormField label="Projetos permitidos">
+            <div className="max-h-52 space-y-2 overflow-y-auto rounded-xl border border-[#d3dceb] bg-white p-3">
+              {projects.length === 0 ? (
+                <p className="text-xs text-[#727783]">Nenhum projeto disponível para vincular.</p>
+              ) : (
+                projects.map((project) => {
+                  const checked = inviteProjectIds.includes(project.id);
+
+                  return (
+                    <label key={project.id} className="flex cursor-pointer items-center gap-2 text-sm text-[#191c21]">
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() => toggleInviteProject(project.id)}
+                        className="h-4 w-4 rounded-lg border-[#c4cede] text-[#005EB8] focus:ring-[#005EB8]"
+                      />
+                      <span>{project.name}</span>
+                    </label>
+                  );
+                })
+              )}
+            </div>
+          </FormField>
+
           <div className="flex items-center justify-end gap-2 pt-2">
-            <Button type="button" variant="subtle" onClick={() => setShowAddForm(false)} className="text-[#424752]">
+            <Button type="button" variant="subtle" onClick={() => setShowInviteModal(false)} className="text-[#424752]">
               Cancelar
             </Button>
-            <Button type="submit" variant="secondary" disabled={isAdding}>
-              {isAdding ? 'Salvando...' : 'Salvar colaborador'}
+            <Button type="submit" variant="secondary" disabled={isInviting || projects.length === 0}>
+              {isInviting ? 'Enviando...' : 'Enviar convite'}
             </Button>
           </div>
         </form>

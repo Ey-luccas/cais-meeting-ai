@@ -42,8 +42,27 @@ const updateMemberRoleSchema = z.object({
 });
 
 const dashboardQuerySchema = z.object({
-  days: z.coerce.number().int().min(7).max(365).optional()
+  days: z.coerce.number().int().min(1).max(365).optional(),
+  period: z.enum(['day', 'week', 'month', 'custom']).optional(),
+  from: z.string().trim().optional(),
+  to: z.string().trim().optional()
 });
+
+const parseDateBoundary = (rawValue: string, boundary: 'start' | 'end'): Date | null => {
+  const value = rawValue.trim();
+
+  if (!value) {
+    return null;
+  }
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    const parsedDate = new Date(`${value}T${boundary === 'end' ? '23:59:59.999' : '00:00:00.000'}`);
+    return Number.isNaN(parsedDate.getTime()) ? null : parsedDate;
+  }
+
+  const parsedDate = new Date(value);
+  return Number.isNaN(parsedDate.getTime()) ? null : parsedDate;
+};
 
 export class OrganizationsController {
   async getCurrent(req: Request, res: Response): Promise<void> {
@@ -67,9 +86,53 @@ export class OrganizationsController {
       throw new AppError(400, 'Parâmetros inválidos para dashboard.', query.error.flatten());
     }
 
+    const now = new Date();
+    let from: Date | undefined;
+    let to: Date | undefined;
+
+    switch (query.data.period) {
+      case 'day':
+        to = now;
+        from = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+        break;
+      case 'week':
+        to = now;
+        from = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        break;
+      case 'month':
+        to = now;
+        from = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+        break;
+      case 'custom': {
+        const parsedFrom = parseDateBoundary(query.data.from ?? '', 'start');
+        const parsedTo = parseDateBoundary(query.data.to ?? '', 'end');
+
+        if (!parsedFrom || !parsedTo) {
+          throw new AppError(400, 'Para período personalizado, informe datas válidas de início e fim.');
+        }
+
+        if (parsedFrom.getTime() > parsedTo.getTime()) {
+          throw new AppError(400, 'A data inicial não pode ser maior que a data final.');
+        }
+
+        const diffDays = Math.ceil((parsedTo.getTime() - parsedFrom.getTime()) / (24 * 60 * 60 * 1000));
+        if (diffDays > 365) {
+          throw new AppError(400, 'Período personalizado limitado a 365 dias.');
+        }
+
+        from = parsedFrom;
+        to = parsedTo;
+        break;
+      }
+      default:
+        break;
+    }
+
     const dashboard = await organizationsService.getOrganizationDashboard({
       organizationId: req.auth.organizationId,
-      days: query.data.days ?? 30
+      days: query.data.days ?? 30,
+      from,
+      to
     });
 
     res.json(dashboard);

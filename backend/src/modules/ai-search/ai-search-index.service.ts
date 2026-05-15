@@ -16,6 +16,16 @@ const TRANSCRIPT_CHUNK_MAX = 1200;
 
 const normalizeWhitespace = (value: string): string => value.replace(/\s+/g, ' ').trim();
 
+const truncateText = (value: string, max: number): string => {
+  const normalized = normalizeWhitespace(value);
+
+  if (normalized.length <= max) {
+    return normalized;
+  }
+
+  return `${normalized.slice(0, Math.max(1, max - 1))}…`;
+};
+
 const safeIso = (value: Date | string | null | undefined): string | null => {
   if (!value) {
     return null;
@@ -379,7 +389,18 @@ export class AiSearchIndexService {
           }
         },
         transcript: true,
-        note: true
+        note: true,
+        observations: {
+          orderBy: {
+            createdAt: 'desc'
+          },
+          take: 12,
+          select: {
+            type: true,
+            timestampSeconds: true,
+            content: true
+          }
+        }
       }
     });
 
@@ -455,6 +476,17 @@ export class AiSearchIndexService {
     const tasks = toTaskArray(meeting.note.actionItemsJson);
     const pendingItems = toStringArray(meeting.note.pendingItemsJson);
     const comments = toStringArray(meeting.note.commentsJson);
+    const observations = meeting.observations
+      .map((entry) => {
+        const content = truncateText(entry.content, 180);
+
+        if (!content) {
+          return null;
+        }
+
+        return `[${entry.type} @ ${entry.timestampSeconds}s] ${content}`;
+      })
+      .filter((entry): entry is string => Boolean(entry));
 
     await this.replaceChunksBySource({
       organizationId: input.organizationId,
@@ -468,7 +500,8 @@ export class AiSearchIndexService {
             `Resumo: ${normalizeWhitespace(meeting.note.summary)}`,
             topics.length > 0 ? `Tópicos: ${topics.join(' | ')}` : null,
             pendingItems.length > 0 ? `Pendências: ${pendingItems.join(' | ')}` : null,
-            comments.length > 0 ? `Comentários: ${comments.join(' | ')}` : null
+            comments.length > 0 ? `Comentários: ${comments.join(' | ')}` : null,
+            observations.length > 0 ? `Observações: ${observations.join(' | ')}` : null
           ]
             .filter(Boolean)
             .join(' | '),
@@ -494,7 +527,7 @@ export class AiSearchIndexService {
         title: `Decisão ${index + 1}: ${meeting.title}`,
         content: decision,
         summary: decision,
-        href: meetingHref,
+        href: `${meetingHref}?highlight=meeting-decision-${index + 1}`,
         metadataJson: {
           entity: 'decision',
           meetingId: meeting.id,
@@ -523,7 +556,7 @@ export class AiSearchIndexService {
           .filter(Boolean)
           .join(' | '),
         summary: task.description,
-        href: `/projects/${meeting.projectId}/board`,
+        href: `${meetingHref}?highlight=meeting-task-${index + 1}`,
         metadataJson: {
           entity: 'task',
           meetingId: meeting.id,

@@ -1,5 +1,7 @@
 import type {
   AiSearchAskResponse,
+  CollaboratorInvitationSummary,
+  InvitationValidationResponse,
   AiSearchThreadDetail,
   AiSearchThreadSummary,
   BoardCard,
@@ -111,6 +113,33 @@ export const api = {
       body: JSON.stringify(input)
     }),
 
+  validateInvitationToken: (token: string) =>
+    request<InvitationValidationResponse>(`/auth/invitations/${encodeURIComponent(token)}`),
+
+  acceptInvitation: (
+    token: string,
+    payload: {
+      name: string;
+      password: string;
+    }
+  ) =>
+    request<SessionResponse>(`/auth/invitations/${encodeURIComponent(token)}/accept`, {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    }),
+
+  forgotPassword: (payload: { email: string }) =>
+    request<{ message: string }>('/auth/forgot-password', {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    }),
+
+  resetPassword: (payload: { token: string; password: string }) =>
+    request<{ message: string }>('/auth/reset-password', {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    }),
+
   getSession: (token?: string) =>
     request<SessionResponse>('/auth/session', {
       token
@@ -119,12 +148,17 @@ export const api = {
   updateProfile: async (
     token: string,
     payload: {
+      name?: string;
       phone?: string | null;
       avatar?: File;
       removeAvatar?: boolean;
     }
   ) => {
     const body = new FormData();
+
+    if (payload.name !== undefined) {
+      body.append('name', payload.name);
+    }
 
     if (payload.phone !== undefined) {
       body.append('phone', payload.phone ?? '');
@@ -156,9 +190,29 @@ export const api = {
       token
     }),
 
-  getOrganizationDashboard: (token: string, days = 30) => {
+  getOrganizationDashboard: (
+    token: string,
+    filters?: {
+      days?: number;
+      period?: 'day' | 'week' | 'month' | 'custom';
+      from?: string;
+      to?: string;
+    }
+  ) => {
     const query = new URLSearchParams();
-    query.set('days', String(days));
+    query.set('days', String(filters?.days ?? 30));
+
+    if (filters?.period) {
+      query.set('period', filters.period);
+    }
+
+    if (filters?.from) {
+      query.set('from', filters.from);
+    }
+
+    if (filters?.to) {
+      query.set('to', filters.to);
+    }
 
     return request<OrganizationDashboardResponse>(
       `/organizations/current/dashboard?${query.toString()}`,
@@ -184,6 +238,28 @@ export const api = {
       method: 'POST',
       token,
       body: JSON.stringify(payload)
+    }),
+
+  inviteCollaborator: (
+    token: string,
+    payload: {
+      email: string;
+      role: 'OWNER' | 'ADMIN' | 'MEMBER' | 'VIEWER';
+      projectIds: string[];
+    }
+  ) =>
+    request<{
+      invitation: CollaboratorInvitationSummary;
+      emailSent: boolean;
+    }>('/collaborators/invite', {
+      method: 'POST',
+      token,
+      body: JSON.stringify(payload)
+    }),
+
+  listPendingCollaboratorInvitations: (token: string) =>
+    request<{ invitations: CollaboratorInvitationSummary[] }>('/collaborators/invitations', {
+      token
     }),
 
   updateOrganizationMemberRole: (
@@ -1039,6 +1115,19 @@ export const api = {
   getAiSearchThread: (token: string, threadId: string) =>
     request<AiSearchThreadDetail>(`/ai-search/threads/${threadId}`, {
       token
+    }),
+
+  updateAiSearchThread: (
+    token: string,
+    threadId: string,
+    payload: {
+      title: string;
+    }
+  ) =>
+    request<AiSearchThreadSummary>(`/ai-search/threads/${threadId}`, {
+      method: 'PATCH',
+      token,
+      body: JSON.stringify(payload)
     }),
 
   sendAiSearchMessage: (

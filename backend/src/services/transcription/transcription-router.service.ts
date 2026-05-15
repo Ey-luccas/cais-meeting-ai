@@ -1,14 +1,13 @@
 import { env } from '../../config/env';
-import type { TranscriptionResult } from './types';
-import { GroqTranscriptionProvider } from './groq-provider';
+import { elevenlabsTranscriptionService } from '../../modules/meetings/services/elevenlabs-transcription.service';
+import type { TranscriptionEngine, TranscriptionResult } from './types';
 import { LocalFallbackTranscriptionProvider } from './local-fallback-provider';
 
-const groqProvider = new GroqTranscriptionProvider();
 const localProvider = new LocalFallbackTranscriptionProvider();
 
 export class TranscriptionRouterService {
   async transcribe(filePath: string): Promise<{
-    engine: 'GROQ' | 'LOCAL_FALLBACK';
+    engine: TranscriptionEngine;
     result: TranscriptionResult;
   }> {
     if (env.TRANSCRIPTION_ENGINE === 'LOCAL_FALLBACK') {
@@ -19,8 +18,8 @@ export class TranscriptionRouterService {
     }
 
     return {
-      engine: groqProvider.name,
-      result: await groqProvider.transcribe(filePath)
+      engine: 'ELEVENLABS',
+      result: await elevenlabsTranscriptionService.transcribe(filePath)
     };
   }
 }

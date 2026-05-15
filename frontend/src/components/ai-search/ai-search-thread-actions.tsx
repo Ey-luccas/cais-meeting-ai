@@ -1,20 +1,33 @@
-import { Archive, Trash2 } from 'lucide-react';
+import { Archive, PencilLine, Trash2 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 
 type AiSearchThreadActionsProps = {
   disabled?: boolean;
+  onRename: () => void;
   onArchive: () => void;
   onDelete: () => void;
 };
 
 export const AiSearchThreadActions = ({
   disabled = false,
+  onRename,
   onArchive,
   onDelete
 }: AiSearchThreadActionsProps) => {
   return (
     <div className="flex items-center gap-2">
+      <Button
+        type="button"
+        variant="subtle"
+        size="sm"
+        disabled={disabled}
+        className="gap-1"
+        onClick={onRename}
+      >
+        <PencilLine className="h-3.5 w-3.5" />
+        Renomear
+      </Button>
       <Button
         type="button"
         variant="subtle"

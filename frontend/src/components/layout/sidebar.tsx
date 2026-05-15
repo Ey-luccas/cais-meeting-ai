@@ -76,7 +76,7 @@ export const Sidebar = ({
             alt="Logo Cais"
             width={36}
             height={36}
-            className="h-9 w-auto rounded-lg"
+            className="h-9 w-9 rounded-xl"
             priority
           />
           <span className={cn('min-w-0', isMinimized && 'hidden')}>
@@ -89,7 +89,7 @@ export const Sidebar = ({
           href={newMeetingHref}
           onClick={onClose}
           className={cn(
-            'mb-6 inline-flex h-10 items-center justify-center rounded-[10px] bg-cta text-sm font-semibold text-[#191c21] transition-colors hover:bg-[#e8a914]',
+            'mb-6 inline-flex h-10 items-center justify-center bg-cta text-sm font-semibold text-[#191c21] transition-colors hover:bg-[#e8a914]',
             isMinimized ? 'mx-1 gap-0 px-0' : 'gap-2 px-4'
           )}
           title="Nova reunião"
@@ -112,7 +112,7 @@ export const Sidebar = ({
                 onClick={onClose}
                 title={item.label}
                 className={cn(
-                  'flex h-10 items-center rounded-[10px] text-sm font-medium text-app-muted transition-colors hover:bg-app-active hover:text-brand',
+                  'flex h-10 items-center text-sm font-medium text-app-muted transition-colors hover:bg-app-active hover:text-brand',
                   isMinimized ? 'justify-center px-1' : 'gap-3 px-3',
                   isActive && 'bg-app-active text-brand'
                 )}
@@ -128,7 +128,7 @@ export const Sidebar = ({
           {/* <button
             type="button"
             title="Configurações"
-            className="flex h-10 w-full items-center gap-3 rounded-[10px] px-3 text-left text-sm font-medium text-app-muted transition-colors hover:bg-app-active hover:text-brand"
+            className="flex h-10 w-full items-center gap-3 rounded-xl px-3 text-left text-sm font-medium text-app-muted transition-colors hover:bg-app-active hover:text-brand"
           >
             <Settings className="h-4 w-4" />
             <span className={cn(isMinimized && 'hidden')}>Configurações</span>
@@ -136,7 +136,7 @@ export const Sidebar = ({
           {/* <button
             type="button"
             title="Suporte"
-            className="flex h-10 w-full items-center gap-3 rounded-[10px] px-3 text-left text-sm font-medium text-app-muted transition-colors hover:bg-app-active hover:text-brand"
+            className="flex h-10 w-full items-center gap-3 rounded-xl px-3 text-left text-sm font-medium text-app-muted transition-colors hover:bg-app-active hover:text-brand"
           >
             <HelpCircle className="h-4 w-4" />
             <span className={cn(isMinimized && 'hidden')}>Suporte</span>
@@ -145,7 +145,7 @@ export const Sidebar = ({
             type="button"
             onClick={onSignOut}
             title="Sair"
-            className="flex h-10 w-full items-center gap-3 rounded-[10px] px-3 text-left text-sm font-medium text-app-muted transition-colors hover:bg-red-50 hover:text-red-700"
+            className="flex h-10 w-full items-center gap-3 rounded-xl px-3 text-left text-sm font-medium text-app-muted transition-colors hover:bg-red-50 hover:text-red-700"
           >
             <LogOut className="h-4 w-4" />
             <span className={cn(isMinimized && 'hidden')}>Sair</span>

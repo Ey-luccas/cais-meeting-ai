@@ -15,7 +15,7 @@ const toneClassName = {
 };
 
 export const StatusBadge = ({ label, tone = 'neutral', className }: StatusBadgeProps) => (
-  <span className={cn('inline-flex items-center rounded-[999px] border px-2.5 py-1 text-xs font-semibold', toneClassName[tone], className)}>
+  <span className={cn('inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold', toneClassName[tone], className)}>
     {label}
   </span>
 );

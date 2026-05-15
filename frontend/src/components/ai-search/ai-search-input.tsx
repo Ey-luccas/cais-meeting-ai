@@ -1,6 +1,6 @@
 'use client';
 
-import { SendHorizontal } from 'lucide-react';
+import { Loader2, SendHorizontal } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 import { Button } from '@/components/ui/button';
@@ -9,8 +9,10 @@ type AiSearchInputProps = {
   disabled?: boolean;
   isSending?: boolean;
   initialValue?: string;
+  resetKey?: string | number | null;
   placeholder?: string;
   disabledReason?: string | null;
+  onValueChange?: (value: string) => void;
   onSubmit: (question: string) => Promise<void> | void;
 };
 
@@ -18,15 +20,18 @@ export const AiSearchInput = ({
   disabled = false,
   isSending = false,
   initialValue = '',
+  resetKey,
   placeholder = 'Pergunte sobre reuniões, decisões, tarefas, arquivos e projetos.',
   disabledReason = null,
+  onValueChange,
   onSubmit
 }: AiSearchInputProps) => {
   const [value, setValue] = useState(initialValue);
 
   useEffect(() => {
     setValue(initialValue);
-  }, [initialValue]);
+    onValueChange?.(initialValue);
+  }, [initialValue, onValueChange, resetKey]);
 
   const canSubmit = !disabled && !isSending && value.trim().length >= 2;
 
@@ -37,14 +42,19 @@ export const AiSearchInput = ({
 
     const question = value.trim();
     setValue('');
+    onValueChange?.('');
     await onSubmit(question);
   };
 
   return (
-    <div className="rounded-[10px] border border-[#d7dfec] bg-white p-3 shadow-[0_8px_20px_rgba(10,40,78,0.05)]">
+    <div className="rounded-xl border border-[#d7dfec] bg-white p-3 shadow-[0_8px_20px_rgba(10,40,78,0.05)]">
       <textarea
         value={value}
-        onChange={(event) => setValue(event.target.value)}
+        onChange={(event) => {
+          const nextValue = event.target.value;
+          setValue(nextValue);
+          onValueChange?.(nextValue);
+        }}
         onKeyDown={(event) => {
           if (event.key === 'Enter' && !event.shiftKey) {
             event.preventDefault();
@@ -64,8 +74,8 @@ export const AiSearchInput = ({
           disabled={!canSubmit}
           className="h-10 gap-2 rounded-lg bg-[#005eb8] px-4 text-white hover:bg-[#004b93]"
         >
-          <SendHorizontal className="h-4 w-4" />
-          Enviar
+          {isSending ? <Loader2 className="h-4 w-4 animate-spin" /> : <SendHorizontal className="h-4 w-4" />}
+          {isSending ? 'Buscando...' : 'Enviar'}
         </Button>
       </div>
     </div>

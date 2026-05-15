@@ -11,6 +11,7 @@ import type {
 import { prisma } from '../../config/prisma';
 import { AppError } from '../../shared/app-error';
 import { logger } from '../../shared/logger';
+import { resolveProjectAccess } from '../../shared/project-access';
 import { toPublicFileUrl } from '../../shared/storage';
 import { aiSearchIndexService } from '../ai-search/ai-search-index.service';
 import { notificationEventService } from '../notifications/notification-event.service';
@@ -179,9 +180,6 @@ const toPlainTextFromMarkdown = (value: string): string => {
     .trim();
 };
 
-const roleCanWrite = (role: ProjectRole | null): boolean => role !== null && role !== 'VIEWER';
-const roleCanAdmin = (role: ProjectRole | null): boolean => role === 'OWNER' || role === 'ADMIN';
-
 const toPrismaJsonInput = (
   value: Prisma.InputJsonValue | Prisma.JsonValue | null | undefined
 ): Prisma.InputJsonValue | Prisma.NullableJsonNullValueInput | undefined => {
@@ -204,39 +202,16 @@ export class LibraryService {
     organizationRole: OrganizationRole;
     required: ProjectAccessLevel;
   }): Promise<ProjectAccessContext> {
-    const project = await prisma.project.findFirst({
-      where: {
-        id: input.projectId,
-        organizationId: input.organizationId
-      },
-      select: {
-        id: true,
-        name: true,
-        members: {
-          where: {
-            userId: input.userId
-          },
-          select: {
-            role: true
-          },
-          take: 1
-        }
-      }
+    const access = await resolveProjectAccess({
+      organizationId: input.organizationId,
+      projectId: input.projectId,
+      userId: input.userId,
+      organizationRole: input.organizationRole,
+      requiredAccess: 'read'
     });
 
-    if (!project) {
-      throw new AppError(404, 'Projeto não encontrado.');
-    }
-
-    const isOrgAdmin = input.organizationRole === 'OWNER' || input.organizationRole === 'ADMIN';
-    const projectRole = project.members[0]?.role ?? null;
-
-    if (!isOrgAdmin && !projectRole) {
-      throw new AppError(403, 'Você não tem acesso a este projeto.');
-    }
-
-    const canWrite = isOrgAdmin || roleCanWrite(projectRole);
-    const canAdmin = isOrgAdmin || roleCanAdmin(projectRole);
+    const canWrite = access.canWrite;
+    const canAdmin = access.canAdmin;
     const canReadDraft = canWrite;
 
     if (input.required === 'write' && !canWrite) {
@@ -248,12 +223,12 @@ export class LibraryService {
     }
 
     return {
-      id: project.id,
-      name: project.name,
+      id: access.project.id,
+      name: access.project.name,
       canWrite,
       canAdmin,
       canReadDraft,
-      projectRole
+      projectRole: access.projectRole
     };
   }
 

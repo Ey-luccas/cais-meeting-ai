@@ -18,7 +18,7 @@ export const Modal = ({ open, title, description, onClose, children, className }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4">
-      <div className={cn('w-full max-w-xl rounded-[14px] border border-app bg-white shadow-soft', className)}>
+      <div className={cn('w-full max-w-xl rounded-2xl border border-app bg-white shadow-soft', className)}>
         <div className="flex items-start justify-between gap-4 border-b border-app px-5 py-4">
           <div className="min-w-0">
             <h3 className="truncate text-lg font-bold text-[#111827]">{title}</h3>
@@ -27,7 +27,7 @@ export const Modal = ({ open, title, description, onClose, children, className }
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg p-2 text-app-muted transition-colors hover:bg-app-active hover:text-brand"
+            className="rounded-xl p-2 text-app-muted transition-colors hover:bg-app-active hover:text-brand"
             aria-label="Fechar modal"
           >
             <X className="h-4 w-4" />

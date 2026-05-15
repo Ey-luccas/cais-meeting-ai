@@ -18,7 +18,7 @@ const tabs = [
   { label: 'Quadro', href: '/board' },
   { label: 'Biblioteca', href: '/library' },
   { label: 'Relatórios', href: '/reports' },
-  { label: 'Pesquisa IA', href: '/ai-search' }
+  { label: 'Configurações', href: '/settings' }
 ];
 
 export const ProjectSubnav = ({ projectId, projectName = 'Projeto', projectColor }: ProjectSubnavProps) => {
@@ -34,7 +34,7 @@ export const ProjectSubnav = ({ projectId, projectName = 'Projeto', projectColor
             style={{ backgroundColor: projectColor ?? '#005EB8' }}
           />
           <p className="truncate text-sm font-semibold text-[#111827]">{projectName}</p>
-          <span className="rounded-[999px] border border-[#d7e3f7] bg-[#eef5ff] px-2.5 py-0.5 text-[11px] font-semibold text-brand">
+          <span className="rounded-full border border-[#d7e3f7] bg-[#eef5ff] px-2.5 py-0.5 text-[11px] font-semibold text-brand">
             Projeto ativo
           </span>
         </div>
@@ -51,7 +51,7 @@ export const ProjectSubnav = ({ projectId, projectName = 'Projeto', projectColor
                 key={tab.label}
                 href={href}
                 className={cn(
-                  'whitespace-nowrap rounded-[9px] px-3 py-2 text-xs font-semibold text-app-muted transition-colors hover:bg-app-active hover:text-brand',
+                  'whitespace-nowrap rounded-lg px-3 py-2 text-xs font-semibold text-app-muted transition-colors hover:bg-app-active hover:text-brand',
                   isActive && 'bg-app-active text-brand'
                 )}
               >
